@@ -15,6 +15,7 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
     });
     const [teams, setTeams] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
+    const [canAssign, setCanAssign] = useState(false);
 
     const { description, assigned_to, team, due_date, status } = formData;
     const navigate = useNavigate();
@@ -41,16 +42,22 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                     const usersRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/${team}/users-in-same-team/`, { withCredentials: true });
                     console.log('Fetched users:', usersRes.data); // Debugging log
                     setFilteredUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+
+                    // Check if the user is the owner of the selected team
+                    const selectedTeam = teams.find(t => t.id === parseInt(team));
+                    const isOwner = selectedTeam && selectedTeam.members.some(membership => membership.user === user.id && membership.role === 'owner');
+                    setCanAssign(isOwner);
                 } catch (err) {
                     console.error('Failed to fetch users:', err);
                 }
             } else {
                 setFilteredUsers(user ? [user] : []);
+                setCanAssign(false);
             }
         };
 
         fetchUsers();
-    }, [team, user]);
+    }, [team, user, teams]);
 
     const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -108,6 +115,7 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                             value={assigned_to}
                             onChange={onChange}
                             required
+                            disabled={!canAssign}
                         >
                             <option value="">Select Member</option>
                             {filteredUsers.map(user => (

@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-from sop.models import UserAccount, Team, TeamMembership, Task
+from api.models import UserAccount, Team, TeamMembership, Task
 
 class TaskCreationTest(TestCase):
     def setUp(self):
