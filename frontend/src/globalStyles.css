@@ -1,0 +1,405 @@
+/* globalStyles.css */
+body {
+    background-color: #111049;
+    color: #F2F2F7;
+    font-family: 'Koh Santepheap', sans-serif; /* Optional: Change the font */
+}
+
+.home-page {
+    background-color: #F2F2F7;
+    min-height: 100vh;
+}
+
+.entry-container {
+    padding-top: 70px;
+}
+
+a {
+    color: #111049; /* Link color */
+}
+
+a:hover {
+    font-weight: bold; /* make the link bold */
+}
+
+p {
+    color: #111049; 
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #111049; /* Header color */
+}
+
+.white p { /* override p for sidebar */
+    color: #F2F2F7;
+}
+
+.user-greeting { /* New style for user greeting */
+    color: #f2f2f2; /* Lighter shade of blue */
+    font-size: 1.5em; /* Increase the font size */
+    font-weight: bold; /* Make the text bold */
+    margin-bottom: 20px; /* Add some space below the greeting */
+}
+
+.user-initial {
+    display: inline-block;
+    width: 60px; /* Increase the width */
+    height: 60px; /* Increase the height */
+    line-height: 60px; /* Match the height for vertical centering */
+    border-radius: 50%;
+    background-color: #111049; /* Circle background color */
+    color: #f2f2f2; /* Text color */
+    text-align: center;
+    font-size: 2em; /* Increase the font size */
+    font-weight: bold;
+    margin-right: 10px; /* Space between circle and greeting */
+}
+
+/* Circle with initial */
+.member-initial {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    border-radius: 50%;
+    background-color: #111049; /* Circle background color */
+    color: #f2f2f2; /* Text color */
+    text-align: center;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-right: 10px; /* Space between circle and text */
+    position: relative;
+}
+
+/* Tooltip */
+.member-initial:hover::after {
+    content: attr(data-fullname); /* Display full name */
+    position: absolute;
+    bottom: 100%; /* Position above the circle */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #111049;
+    color: #f2f2f2;
+    padding: 5px 10px;
+    border-radius: 5px;
+    white-space: nowrap;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    font-size: 0.8em; /* Smaller font size for tooltip */
+}
+
+/* Remove bullet points and display inline */
+ul.member-list {
+    list-style-type: none; /* Remove bullet points */
+    padding: 0; /* Remove padding */
+    display: flex; /* Display items inline */
+    flex-wrap: wrap; /* Allow wrapping to the next line if needed */
+}
+
+ul.member-list li {
+    margin-right: 10px; /* Space between list items */
+}
+
+/* Top Banner Image with Slanted Effect */
+.image-container {
+    position: relative;
+    overflow: hidden;
+    height: 225px;
+    margin-top: 66px;
+    margin-bottom: 20px;
+}
+
+.slanted-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: skewY(-3deg);
+    transform-origin: top left;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Style for all buttons */
+.btn {
+    background-color: #111049; /* Navy blue background */
+    border-color: #111049; /* Matching border */
+    color: white; /* White text */
+    border-radius: 4px; /* Rounded corners */
+    padding: 0.5rem 1rem; /* Optional: Adjust padding for consistent sizing */
+    transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Smooth transitions */
+}
+
+/* Hover state for buttons */
+.btn:hover {
+    background-color: #111049; /* Darker navy blue on hover */
+    border-color: #F2F2F7; /* Matching border on hover */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow on hover */
+    color: white; /* Ensure text color remains white */
+}
+
+/* Optional: Outline button variant */
+.btn-outline-primary {
+    background-color: #F2F2F7; /* Transparent background */
+    border-color: #111049; /* Navy blue border */
+    color: #111049; /* Navy blue text */
+}
+
+.btn-outline-primary:hover {
+    background-color: #111049; /* Navy blue on hover */
+    color: white; /* White text on hover */
+    border-color: #F2F2F7;
+    border-radius: 4px; /* Keep the same rounded corners */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Optional: subtle shadow */
+}
+
+/* Specific style for the create team link in ViewTeams */
+.create-new-link {
+    margin-left: auto; /* Push the link to the right */
+}
+
+/* Custom styles for the dropdown menu */
+.custom-dropdown-menu {
+    background-color: #111049; /* Navy background */
+    color: white; /* White text */
+}
+
+.custom-dropdown-menu .dropdown-item {
+    color: white; /* White text for dropdown items */
+}
+
+.custom-dropdown-menu .dropdown-item:hover {
+    background-color: #111049; /* Darker navy on hover */
+}
+
+.row {
+    display: flex; /* Ensures child elements stretch */
+    align-items: stretch;
+}
+
+.card {
+    height: 100%; /* Ensures the cards take up the full height of the row */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Keeps content spaced properly */
+    border-color: #111049;
+    background-color: #f2f2f2;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Adjust card images */
+.card img {
+    object-fit: cover;
+    height: 100%; /* Ensures the image fills the card height */
+    width: 100%;
+}
+
+/* Sidebar styles */
+.sidebar {
+    position: fixed;
+    height: calc(100vh - 66px); 
+    overflow-y: auto;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;  /*Ensures it stays above other content */
+    padding: 1rem; /* Adds padding inside the sidebar */
+    overflow-y: auto; /* Enables scrolling if content exceeds height */
+    width: 250px; /* Fixed width for the sidebar */
+    background-color: #353488;
+    border-right: 1px solid #353488; /* Adds a subtle border to the right */
+    box-shadow: 10px 0 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar links */
+.sidebar .nav-link {
+    color: #F2F2F7; /* Navy blue for links */
+    font-size: 1.2em;
+    padding: 10px 15px; /* Adjusts padding for better spacing */
+    display: block; /* Ensures the full width of the link is clickable */
+    transition: background-color 0.3s, font-weight 0.3s; /* Smooth hover effects */
+}
+
+/* Hover effect for links */
+.sidebar .nav-item .nav-link:hover {
+    text-decoration: underline;
+}
+
+/* Active link */
+.sidebar .nav-link.active {
+    text-decoration: underline;
+}
+
+/* Adjust content area to accommodate the sidebar */
+.main-content {
+    margin-left: 250px; /* Matches the sidebar width */
+    padding: 2rem;
+    min-height: 92vh; /* Ensure the content fills the viewport height */
+    flex: 1;
+    background: #111049;
+    border-radius: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-top: 4rem;
+}
+
+.recent-items-card {
+    width: 100%;
+    padding: 2rem;
+    background: #F2F2F7;
+    border-radius: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    min-height: calc(92vh - 4rem);
+}
+
+.navbar {
+    position: fixed;
+    width: 100%;
+    top: 0px;
+}
+
+.back-arrow {
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: #F2F2F7;
+    position: absolute;
+    left: 0;
+    top: 80px;
+    margin-left: 20px;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+    color: white;
+}
+
+.btn-primary,
+.btn-danger {
+    margin-right: 10px;
+}
+
+.btn-primary:last-child,
+.btn-danger:last-child {
+    margin-right: 0;
+}
+
+.action-icon {
+    cursor: pointer;
+    font-size: 1.3rem;
+    color: #111049; /* Purple color */
+
+}
+
+.action-icon:hover {
+    color: #0b0b33; /* Darker purple on hover */
+}
+
+.delete-icon {
+    color: #111049; /* Red color for delete icon */
+    margin-left: 15px;
+}
+
+.delete-icon:hover {
+    color: #0b0b33; /* Darker red on hover */
+}
+
+.table {
+    width: 100%;
+    margin-bottom: 30px;
+
+}
+
+.table th, .table td {
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.table th {
+    border-bottom: none;
+    font-weight: bold;
+    background: #F2F2F7;
+}
+
+.table td {
+    background: #F2F2F7;
+    border-bottom: none;
+    vertical-align: middle;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.truncate-description {
+    max-width: 300px;
+    min-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+
+
+/* Expanded row styling */
+.expanded-row {
+    background-color: #f9f9f9;
+    border-top: 1px solid #ddd;
+}
+
+.expanded-content {
+    padding: 10px;
+    background-color: #eaeaea;
+    border-radius: 6px;
+}
+
+.status-width {
+    width: 40px; /* Set a specific width for the status column */
+    text-align: center; /* Center the icon horizontally */
+}
+
+.status-icon {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    text-align: center; /* Center content horizontally */
+    width: 100%;
+}
+
+.status-icon .tooltip {
+    visibility: hidden;
+    width: 120px;
+    background-color: #111049;
+    color: #F2F2F7;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%; /* Position the tooltip above the icon */
+    left: 50%;
+    margin-left: -60px; /* Use half of the tooltip width to center it */
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.status-icon .tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%; /* At the bottom of the tooltip */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #111049 transparent transparent transparent;
+}
+
+.status-icon:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
