@@ -25,7 +25,7 @@ class Command(BaseCommand):
                 self.send_reminder_email(task_id)
 
     def send_reminder_email(self, task_id):
-        from api.models import Task
+        from sop.models import Task
 
         try:
             task = Task.objects.get(id=task_id)

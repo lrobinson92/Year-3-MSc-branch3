@@ -1,6 +1,6 @@
 from django.test import TestCase
-from api.models import Task, Team, TeamMembership, UserAccount
-from api.serializers import TaskSerializer, TeamSerializer, TeamMembershipSerializer
+from sop.models import Task, Team, TeamMembership, UserAccount
+from sop.serializers import TaskSerializer, TeamSerializer, TeamMembershipSerializer
 
 class TeamMembershipSerializerTest(TestCase):
     def setUp(self):
