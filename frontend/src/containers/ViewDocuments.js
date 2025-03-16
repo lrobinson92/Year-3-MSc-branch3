@@ -18,6 +18,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
           { withCredentials: true }
         );
         setDocuments(res.data.files);
+        // If fetching files succeeds, set driveLoggedIn to true.
         setDriveLoggedIn(true);
       } catch (err) {
         console.error(err);
@@ -30,14 +31,9 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
       }
     };
   
-    // Only fetch if we know the user is logged into Google Drive.
-    if (driveLoggedIn) {
-      fetchDocuments();
-    } else {
-      // No drive login yet; simply stop loading.
-      setLoading(false);
-    }
-  }, [driveLoggedIn, setDocuments, setDriveLoggedIn]);
+    // Always attempt to fetch documents on mount.
+    fetchDocuments();
+  }, [setDocuments, setDriveLoggedIn]);
 
 
   if (loading) {
