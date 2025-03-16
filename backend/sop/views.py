@@ -7,7 +7,6 @@ from rest_framework.views import APIView
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
 from django.db.models import Q  # Import Q
-from django.http import JsonResponse
 from django.http import JsonResponse, HttpResponse
 from django.utils.decorators import method_decorator
 from .models import UserAccount, Team, TeamMembership, Task, Document
@@ -18,37 +17,14 @@ from .permissions import IsOwnerOrAssignedUser
 from django.shortcuts import HttpResponseRedirect, redirect, get_object_or_404
 import urllib.parse
 from django.conf import settings
+from django.views import View
+from oauth2client.client import OAuth2Credentials
 import logging
+import json
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
 
 logger = logging.getLogger(__name__)  # Use Django's logging system
-
-def refresh_onedrive_token(user):
-    """Refresh OneDrive access token using the refresh token."""
-    refresh_token = user.profile.onedrive_refresh_token
-    if not refresh_token:
-        return None  # No refresh token available, user needs to re-authenticate
-
-    token_data = {
-        "client_id": settings.ONEDRIVE_CLIENT_ID,
-        "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-    }
-
-    response = requests.post(settings.ONEDRIVE_TOKEN_URL, data=token_data)
-    token_json = response.json()
-
-    logger.info("OneDrive Refresh Token Response: %s", token_json)  # Log the response
-
-    if "access_token" in token_json:
-        # Save new tokens in the user's profile
-        user.profile.onedrive_access_token = token_json["access_token"]
-        user.profile.onedrive_refresh_token = token_json.get("refresh_token", refresh_token)  # Keep old refresh token if not provided
-        user.profile.save()
-        return token_json["access_token"]
-    else:
-        return None  # Refresh failed, user may need to log in again
-    
 
 User = get_user_model()
 
@@ -222,164 +198,55 @@ class UsersInSameTeamView(generics.ListAPIView):
         return UserAccount.objects.filter(team_memberships__team_id=team_id)
     
 
-
-class OneDriveLoginView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-
-        if not request.user.is_authenticated:
-            return JsonResponse({"error": "User is not authenticated"}, status=401)
-
-        params = {
-            "client_id": settings.ONEDRIVE_CLIENT_ID,
-            "response_type": "code",
-            "redirect_uri": settings.ONEDRIVE_REDIRECT_URI,
-            "scope": "Files.Read.All Files.ReadWrite.All offline_access User.Read",
-            "response_mode": "query",
-        }
-        auth_url = f"{settings.ONEDRIVE_AUTH_URL}?{urllib.parse.urlencode(params)}"
-
-        return JsonResponse({"auth_url": auth_url})
-    
-
-    
-
-class OneDriveCallbackView(APIView):
-    permission_classes = []  # No authentication needed here
-
-    def get(self, request):
-        print("📢 OneDrive Callback triggered!")  # Debug
-
-        code = request.GET.get("code")
-        if not code:
-            print("❌ No code provided!")  # Debugging
-            return JsonResponse({"error": "No authorization code provided"}, status=400)
-
-        print("✅ Received OneDrive authorization code!")  # Debug
-
-        token_data = {
-            "client_id": settings.ONEDRIVE_CLIENT_ID,
-            "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": settings.ONEDRIVE_REDIRECT_URI,
-        }
-
-        response = requests.post(settings.ONEDRIVE_TOKEN_URL, data=token_data)
-        token_json = response.json()
-
-        logger.info("OneDrive Token Response: %s", token_json)
-        print("📢 OneDrive Token Response:", token_json)  # Debugging
-
-        if "access_token" in token_json:
-            access_token = token_json["access_token"]
-            refresh_token = token_json.get("refresh_token")
-            print("📢 OneDrive Access Token Response:", access_token)  # Debugging
-
-            response = JsonResponse({"success": True})
-            response.set_cookie(
-                "onedrive_access_token",
-                access_token,
-                httponly=True,
-                secure=False,  # Set to True in production (requires HTTPS)
-                samesite="Lax",
-            )
-            response.set_cookie(
-                "onedrive_refresh_token",
-                refresh_token,
-                httponly=True,
-                secure=False,  # Set to True in production (requires HTTPS)
-                samesite="Lax",
-            )
-
-            print("🚀 Redirecting to frontend...")
-            return redirect("http://localhost:3000/view/documents")  # Redirect
-
-        print("❌ OneDrive authentication failed!")
-        return JsonResponse({"error": "Failed to authenticate"}, status=400)
-
-
-class OneDriveRefreshTokenView(APIView):
-    permission_classes = []
-
-    def post(self, request):
-        refresh_token = request.COOKIES.get("onedrive_refresh_token")
-        if not refresh_token:
-            return Response({"error": "No refresh token found"}, status=401)
-
-        token_data = {
-            "client_id": settings.ONEDRIVE_CLIENT_ID,
-            "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-        }
-
-        response = requests.post(settings.ONEDRIVE_TOKEN_URL, data=token_data)
-        token_json = response.json()
-
-        if "access_token" in token_json:
-            response = JsonResponse({"access_token": token_json["access_token"]})
-            response.set_cookie(
-                "onedrive_access_token",
-                token_json["access_token"],
-                httponly=True,
-                secure=False,
-                samesite="Lax",
-            )
-            return response
-
-        return Response({"error": "Failed to refresh token"}, status=400)
-
-class OneDriveUploadView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        title = request.data.get('title')
-        content = request.data.get('content')
-        team_id = request.data.get('team_id')
-        team = get_object_or_404(Team, id=team_id)
-
-        print("📢 Headers:", request.headers)  # Debugging
-
-        # Upload file to OneDrive
-        access_token = request.headers.get("onedrive_access_token")
-        if not access_token:
-            return Response({"error": "No OneDrive access token found"}, status=401)
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/octet-stream"
-        }
-        upload_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/Documents/{title}.txt:/content"
+class GoogleDriveLoginView(View):
+    def get(self, request, *args, **kwargs):
+        """
+        Initiate OAuth flow with Google Drive.
+        """
+        gauth = GoogleAuth()
+        # Point to your client_secrets.json file (update the path as needed)
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE  # e.g., "client_secrets.json"
         
-        response = requests.put(upload_url, headers=headers, data=content.encode('utf-8'))
-        response_json = response.json()
+        # Get the authentication URL and redirect the user there
+        auth_url = gauth.GetAuthUrl()
+        return redirect(auth_url)
 
-        if response.status_code == 201:
-            # Save document metadata in the database
-            document = Document.objects.create(
-                title=title,
-                file_url=response_json['webUrl'],
-                owner=request.user,
-                team=team
-            )
-            serializer = DocumentSerializer(document)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response({"error": "Upload to OneDrive failed", "details": response_json}, status=response.status_code)
+class GoogleDriveCallbackView(View):
+    def get(self, request, *args, **kwargs):
+        """
+        Handles the OAuth callback from Google, exchanges the code for credentials,
+        and stores the credentials in the session.
+        """
+        code = request.GET.get('code')
+        if not code:
+            return HttpResponse("Error: No authorization code provided", status=400)
+        
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        # Exchange the code for credentials
+        gauth.Auth(code=code)
+        
+        # Save the credentials (as JSON) in the session; in production, store them securely!
+        request.session['google_drive_credentials'] = gauth.credentials.to_json()
+        
+        # Redirect the user to the Documents page (or wherever you need)
+        return redirect("http://localhost:3000/view/documents")
 
-
-class DocumentViewSet(viewsets.ModelViewSet):
-    queryset = Document.objects.all()
-    serializer_class = DocumentSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAssignedUser]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Document.objects.filter(team__team_memberships__user=user) | Document.objects.filter(owner=user)
-
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-
-
+class ListDriveFilesView(View):
+    def get(self, request, *args, **kwargs):
+        creds_json = request.session.get('google_drive_credentials')
+        if not creds_json:
+            return HttpResponse("Not authenticated with Google Drive", status=401)
+        
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        
+        # Load the credentials using from_json, which returns an OAuth2Credentials instance.
+        credentials = OAuth2Credentials.from_json(creds_json)
+        gauth.credentials = credentials
+        
+        drive = GoogleDrive(gauth)
+        file_list = drive.ListFile({'q': "'root' in parents and trashed=false"}).GetList()
+        files = [{"id": f['id'], "title": f['title']} for f in file_list]
+        
+        return JsonResponse({"files": files})

@@ -119,26 +119,9 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
-# OneDrive API settings
-#ONEDRIVE_CLIENT_ID = os.getenv('ONEDRIVE_CLIENT_ID')
-#ONEDRIVE_CLIENT_SECRET = os.getenv('ONEDRIVE_CLIENT_SECRET')
-#ONEDRIVE_REDIRECT_URI = os.getenv('ONEDRIVE_REDIRECT_URI')
-#ONEDRIVE_AUTH_URL = os.getenv('ONEDRIVE_AUTH_URL')
-#ONEDRIVE_TOKEN_URL = os.getenv('ONEDRIVE_TOKEN_URL')
-ONEDRIVE_API_URL = "https://graph.microsoft.com/v1.0"
+# GOOGLEDRIVE
+GOOGLE_CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, 'client_secret.json')
 
-
-# CLIENT_VALUE = VEQ8Q~kp67DwISN-x74t62u--T1G6FredNl-9bk7 # this is what I needed in postman rather than client secret
-#ONEDRIVE_CLIENT_ID = '2b826e87-862d-4227-b109-c17542639ecc'
-#ONEDRIVE_CLIENT_SECRET = 'VEQ8Q~kp67DwISN-x74t62u--T1G6FredNl-9bk7'
-ONEDRIVE_REDIRECT_URI = 'http://localhost:8000/onedrive/callback/'
-#ONEDRIVE_CLIENT_SECRET = 'mid8Q~y3FyjYXJGYcmIPkbhGw-7fMOeAj7hU1bCw'
-
-#SOPify_2
-ONEDRIVE_CLIENT_SECRET = '6Bi8Q~OPGCDOttPe1oMkkfI2EQLAvBiOsnNTObAn'
-ONEDRIVE_CLIENT_ID = '1250b861-54f0-499c-9d96-95082cb01529'
-ONEDRIVE_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
-ONEDRIVE_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 
 AUTH_PASSWORD_VALIDATORS = [
     {

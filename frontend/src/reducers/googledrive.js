@@ -1,31 +1,31 @@
 import { 
-    ONEDRIVE_LOGIN_SUCCESS, 
-    ONEDRIVE_LOGIN_FAIL, 
+    GOOGLE_DRIVE_LOGIN_SUCCESS, 
+    GOOGLE_DRIVE_LOGIN_FAIL, 
     UPLOAD_DOCUMENT_SUCCESS, 
     UPLOAD_DOCUMENT_FAIL 
 } from '../actions/types';
 
 const initialState = {
-    isAuthenticated: false,
+    driveLoggedIn: false,
     documents: [],
     error: null
 };
 
-function onedriveReducer(state = initialState, action) {
+export default function(state = initialState, action) {
     const { type, payload } = action;
 
     switch (type) {
-        case ONEDRIVE_LOGIN_SUCCESS:
+        case GOOGLE_DRIVE_LOGIN_SUCCESS:
             return {
                 ...state,
-                isAuthenticated: true,
+                driveLoggedIn: true,
                 error: null
             };
-        case ONEDRIVE_LOGIN_FAIL:
+        case GOOGLE_DRIVE_LOGIN_FAIL:
             return {
                 ...state,
-                isAuthenticated: false,
-                error: 'Failed to authenticate with OneDrive'
+                driveLoggedIn: false,
+                error: 'Failed to login to Google Drive'
             };
         case UPLOAD_DOCUMENT_SUCCESS:
             return {
@@ -42,5 +42,3 @@ function onedriveReducer(state = initialState, action) {
             return state;
     }
 }
-
-export default onedriveReducer;
