@@ -31,10 +31,14 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
       }
     };
   
-    // Always attempt to fetch documents on mount.
-    fetchDocuments();
-  }, [setDocuments, setDriveLoggedIn]);
-
+    /// Only fetch if we know the user is logged into Google Drive.
+    if (driveLoggedIn) {
+      fetchDocuments();
+    } else {
+      // No drive login yet; simply stop loading.
+      setLoading(false);
+    }
+  }, [driveLoggedIn, setDocuments, setDriveLoggedIn]);
 
   if (loading) {
     return <div>Loading...</div>;
