@@ -64,4 +64,15 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ['id', 'title', 'file_url', 'owner', 'owner_name', 'team', 'team_name', 'created_at', 'updated_at']
+        fields = [
+            'id', 
+            'title', 
+            'file_url',
+            'google_drive_file_id',  # Include the new field
+            'owner', 
+            'owner_name', 
+            'team', 
+            'team_name', 
+            'created_at', 
+            'updated_at'
+        ]

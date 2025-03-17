@@ -130,6 +130,7 @@ class Task(models.Model):
 class Document(models.Model):
     title = models.CharField(max_length=255)
     file_url = models.URLField()
+    google_drive_file_id = models.CharField(max_length=255, blank=True, null=True)  # New field for Google Drive file ID
     owner = models.ForeignKey(UserAccount, on_delete=models.CASCADE)
     team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now, editable=False)
