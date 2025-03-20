@@ -387,57 +387,11 @@ class GoogleDriveFileContentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, document_id):
-        # Get the document record from the database.
+        """ Return the Google Drive file URL instead of fetching content """
         document = get_object_or_404(Document, id=document_id)
-        file_id = document.google_drive_file_id
-        if not file_id:
-            return Response({"error": "Document does not have an associated Google Drive file ID."},
-                            status=400)
-        # Load stored credentials from session.
-        creds_json = request.session.get('google_drive_credentials')
-        if not creds_json:
-            return Response({"error": "Not authenticated with Google Drive."}, status=401)
-        try:
-            credentials = OAuth2Credentials.from_json(creds_json)
-        except Exception as e:
-            logger.error("Failed to load credentials: %s", e, exc_info=True)
-            return Response({"error": "Invalid Google Drive credentials."}, status=400)
-
-        # Prepare PyDrive2.
-        gauth = GoogleAuth()
-        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
-        gauth.credentials = credentials
-        drive = GoogleDrive(gauth)
-
-        # Create a file object using the stored file ID.
-        gfile = drive.CreateFile({'id': file_id})
-        # Fetch metadata if needed.
-        gfile.FetchMetadata(fields='id, title')
-        mime_type = gfile.get('mimeType')
-
-        # Determine how to extract content based on MIME type.
-        if mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-            # Download the DOCX file to a temporary file.
-            try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
-                    temp_path = temp_file.name
-                gfile.GetContentFile(temp_path)
-                # Extract text using docx2txt.
-                content = docx2txt.process(temp_path)
-            except Exception as e:
-                logger.error("Error processing Word document: %s", e, exc_info=True)
-                return Response({"error": "Error processing Word document: " + str(e)}, status=500)
-            finally:
-                try:
-                    os.remove(temp_path)
-                except Exception as remove_error:
-                    logger.warning("Could not remove temporary file: %s", remove_error)
-        else:
-            # Assume the file is a text file.
-            try:
-                content = gfile.GetContentString()
-            except Exception as e:
-                logger.error("Unable to read file content: %s", e, exc_info=True)
-                return Response({"error": "Unable to read file content."}, status=500)
         
-        return Response({"content": content}, status=200)
+        if not document.file_url:
+            return Response({"error": "File URL not found for this document."}, status=400)
+
+        return Response({"file_url": document.file_url}, status=200)
+    
