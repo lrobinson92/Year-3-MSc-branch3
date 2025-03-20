@@ -1,30 +1,32 @@
-import requests
-from rest_framework import status, generics, viewsets
-from rest_framework.response import Response
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, BasePermission
-from rest_framework.views import APIView
-from django.core.mail import send_mail
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.sites.shortcuts import get_current_site
+from django.core.mail import send_mail
 from django.db.models import Q  # Import Q
 from django.http import JsonResponse, HttpResponse
-from django.utils.decorators import method_decorator
-from .models import UserAccount, Team, TeamMembership, Task, Document
-from .serializers import TeamSerializer, TaskSerializer
-from django.contrib.sites.shortcuts import get_current_site
-from sop.serializers import UserCreateSerializer, DocumentSerializer
-from .permissions import IsOwnerOrAssignedUser
 from django.shortcuts import HttpResponseRedirect, redirect, get_object_or_404
-import urllib.parse
-from django.conf import settings
+from django.utils.decorators import method_decorator
 from django.views import View
-from oauth2client.client import OAuth2Credentials
-import logging
-import json
-import os
-import time
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
+from oauth2client.client import OAuth2Credentials
+from rest_framework import status, generics, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from sop.serializers import UserCreateSerializer, DocumentSerializer
+from .models import UserAccount, Team, TeamMembership, Task, Document
+from .permissions import IsOwnerOrAssignedUser
+from .serializers import TeamSerializer, TaskSerializer
+import docx2txt
+import json
+import logging
+import os
+import requests
+import time
+import tempfile
+import urllib.parse
 
 logger = logging.getLogger(__name__)  # Use Django's logging system
 
@@ -258,20 +260,20 @@ class GoogleDriveUploadView(APIView):
 
     def post(self, request):
         try:
-            # Get title, team id, and file from the request.
+            # Get title, team id, and file/text from the request.
             title = request.data.get('title')
             team_id = request.data.get('team_id')
             file_obj = request.FILES.get('file')
             text_content = request.data.get('text_content')
             
             if not title or not team_id:
-                return Response({"error": "Title, team are required."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Title and team are required."}, status=status.HTTP_400_BAD_REQUEST)
             
             if not file_obj and not text_content:
                 return Response({"error": "You must provide either a file or text content."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Retrieve the team (and ensure the current user is allowed to create documents for it)
-            team = get_object_or_404(Team, id=team_id)
+            # Retrieve the team (if not provided, you could default to None for a personal document)
+            team = get_object_or_404(Team, id=team_id) if team_id else None
             
             # Prepare Google Auth with PyDrive2
             gauth = GoogleAuth()
@@ -291,14 +293,15 @@ class GoogleDriveUploadView(APIView):
             gauth.credentials = credentials
             drive = GoogleDrive(gauth)
             
-            # Create a new file on Google Drive.
-            gfile = drive.CreateFile({'title': title})
-            
+            # Create a new Google Docs file by specifying the Google Docs MIME type.
+            # This helps Google Drive convert Word files into an editable Google Docs format.
             if text_content:
-                # Use the text content to create a file.
+                # For text input, create a Google Doc directly.
+                gfile = drive.CreateFile({'title': title})
                 gfile.SetContentString(text_content)
             else:
-                # Use the uploaded file.
+                # For a file upload, do NOT specify a mimeType; let Google detect it and convert.
+                gfile = drive.CreateFile({'title': title})
                 import tempfile
                 with tempfile.NamedTemporaryFile(delete=False) as temp:
                     for chunk in file_obj.chunks():
@@ -307,28 +310,43 @@ class GoogleDriveUploadView(APIView):
                     file_path = temp.name
                 gfile.SetContentFile(file_path)
             
-            gfile.Upload()
+            # Upload with conversion enabled.
+            #gfile.Upload({'convert': True})
 
-            # Insert permission to allow anyone to read the file so that webViewLink is generated.
+             # Retry upload (with conversion) up to max_attempts.
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    gfile.Upload({'convert': True})
+                    break  # if successful, exit the loop
+                except Exception as upload_error:
+                    logger.error("Upload attempt %s failed: %s", attempt + 1, upload_error)
+                    if attempt == max_attempts - 1:
+                        return Response({"error": "Failed to upload file after multiple attempts: " + str(upload_error)},
+                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    time.sleep(2)  # wait before retrying
+
+            # Insert permission to allow anyone to view the document.
             permission = {
                 'type': 'anyone',
-                'role': 'reader'
+                'role': 'writer'
             }
             gfile.InsertPermission(permission)
             
-           # Wait a short time for Google Drive to update metadata.
-            time.sleep(1)
-            
-            # Fetch updated metadata including webViewLink and webContentLink.
-            gfile.FetchMetadata(fields='id, webViewLink, webContentLink, title')
-            
-            # Use webViewLink if available, else fallback to webContentLink.
-            file_url = gfile.get('webViewLink') or gfile.get('webContentLink')
+            # Retry fetching metadata up to max_attempts.
+            file_url = None
+            for attempt in range(max_attempts):
+                time.sleep(2)  # Add a delay before fetching metadata
+                gfile.FetchMetadata(fields='id, webViewLink, webContentLink, title')
+                file_url = gfile.get('alternateLink') or gfile.get('embedLink')
+                logger.info("Attempt %s: Fetched file URL: %s", attempt + 1, file_url)
+                if file_url:
+                    break
+
             if not file_url:
-                # If still not available, log and return an error.
-                logger.error("No public file URL returned from Google Drive.")
+                logger.error("No public file URL returned from Google Drive after %s attempts.", max_attempts)
                 return Response({"error": "File URL not generated by Google Drive."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
+
             drive_file_id = gfile.get('id')
 
             # Optionally remove the temporary file if used.
@@ -338,21 +356,11 @@ class GoogleDriveUploadView(APIView):
                 except Exception as e:
                     logger.warning("Could not remove temporary file: %s", e)
             
-            
-            # Optionally, update sharing permissions on the file if you want to allow team members to view/edit.
-            # You can use the Google Drive API to create permissions, e.g.:
-            # permission = {
-            #     'type': 'user',
-            #     'role': 'reader',  # or 'writer'
-            #     'emailAddress': some_email,
-            # }
-            # gfile.InsertPermission(permission)
-            
             # Save metadata in your database.
             document = Document.objects.create(
                 title=title,
                 file_url=file_url,
-                google_drive_file_id=drive_file_id,  # Save the file ID here
+                google_drive_file_id=drive_file_id,
                 owner=request.user,
                 team=team
             )
@@ -361,5 +369,75 @@ class GoogleDriveUploadView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         except Exception as e:
-                logger.error("Error in GoogleDriveUploadView: %s", e, exc_info=True)
-                return Response({"error": "An internal error occurred: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error("Error in GoogleDriveUploadView: %s", e, exc_info=True)
+            return Response({"error": "An internal error occurred: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        
+class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
+    
+    serializer_class = DocumentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        return Document.objects.filter(Q(team__in=user.teams.all()) | Q(owner=user, team__isnull=True))
+    
+class GoogleDriveFileContentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, document_id):
+        # Get the document record from the database.
+        document = get_object_or_404(Document, id=document_id)
+        file_id = document.google_drive_file_id
+        if not file_id:
+            return Response({"error": "Document does not have an associated Google Drive file ID."},
+                            status=400)
+        # Load stored credentials from session.
+        creds_json = request.session.get('google_drive_credentials')
+        if not creds_json:
+            return Response({"error": "Not authenticated with Google Drive."}, status=401)
+        try:
+            credentials = OAuth2Credentials.from_json(creds_json)
+        except Exception as e:
+            logger.error("Failed to load credentials: %s", e, exc_info=True)
+            return Response({"error": "Invalid Google Drive credentials."}, status=400)
+
+        # Prepare PyDrive2.
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        gauth.credentials = credentials
+        drive = GoogleDrive(gauth)
+
+        # Create a file object using the stored file ID.
+        gfile = drive.CreateFile({'id': file_id})
+        # Fetch metadata if needed.
+        gfile.FetchMetadata(fields='id, title')
+        mime_type = gfile.get('mimeType')
+
+        # Determine how to extract content based on MIME type.
+        if mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            # Download the DOCX file to a temporary file.
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
+                    temp_path = temp_file.name
+                gfile.GetContentFile(temp_path)
+                # Extract text using docx2txt.
+                content = docx2txt.process(temp_path)
+            except Exception as e:
+                logger.error("Error processing Word document: %s", e, exc_info=True)
+                return Response({"error": "Error processing Word document: " + str(e)}, status=500)
+            finally:
+                try:
+                    os.remove(temp_path)
+                except Exception as remove_error:
+                    logger.warning("Could not remove temporary file: %s", remove_error)
+        else:
+            # Assume the file is a text file.
+            try:
+                content = gfile.GetContentString()
+            except Exception as e:
+                logger.error("Unable to read file content: %s", e, exc_info=True)
+                return Response({"error": "Unable to read file content."}, status=500)
+        
+        return Response({"content": content}, status=200)

@@ -1,11 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import TeamViewSet, UsersInSameTeamView, TaskViewSet, GoogleDriveLoginView, GoogleDriveCallbackView, ListDriveFilesView, GoogleDriveUploadView
+from .views import TeamViewSet, UsersInSameTeamView, TaskViewSet, GoogleDriveLoginView, GoogleDriveCallbackView, ListDriveFilesView, GoogleDriveUploadView, DocumentViewSet, GoogleDriveFileContentView
 
 router = DefaultRouter()
 router.register(r'teams', TeamViewSet, basename='team')
 router.register(r'tasks', TaskViewSet, basename='task')
-#router.register(r'documents', DocumentViewSet, basename='document')
+router.register(r'documents', DocumentViewSet, basename='document')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -14,4 +14,5 @@ urlpatterns = [
     path('google-drive/callback/', GoogleDriveCallbackView.as_view(), name='google_drive_callback'),
     path('google-drive/files/', ListDriveFilesView.as_view(), name='list_drive_files'),
     path('google-drive/upload/', GoogleDriveUploadView.as_view(), name='google_drive_upload'),
+    path('google-drive/file-content/<int:document_id>/', GoogleDriveFileContentView.as_view(), name='google_drive_file_content'),
 ]

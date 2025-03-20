@@ -7,6 +7,7 @@ import axiosInstance from '../utils/axiosConfig';
 import { googleDriveLogin, uploadDocument, setDocuments, setDriveLoggedIn } from '../actions/googledrive'; 
 
 const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn, documents, setDocuments, setDriveLoggedIn }) => {
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -14,31 +15,21 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     const fetchDocuments = async () => {
       try {
         const res = await axiosInstance.get(
-          `${process.env.REACT_APP_API_URL}/api/google-drive/files/`,
+          `${process.env.REACT_APP_API_URL}/api/documents/`,
           { withCredentials: true }
         );
-        setDocuments(res.data.files);
-        // If fetching files succeeds, set driveLoggedIn to true.
-        setDriveLoggedIn(true);
+        setDocuments(res.data);
       } catch (err) {
         console.error(err);
-        if (err.response && err.response.status === 401) {
-          setDriveLoggedIn(false);
-        }
-        setError('Failed to fetch documents from Google Drive.');
+        setError('Failed to fetch documents.');
       } finally {
         setLoading(false);
       }
     };
-  
-    /// Only fetch if we know the user is logged into Google Drive.
-    if (driveLoggedIn) {
-      fetchDocuments();
-    } else {
-      // No drive login yet; simply stop loading.
-      setLoading(false);
-    }
-  }, [driveLoggedIn, setDocuments, setDriveLoggedIn]);
+
+    fetchDocuments();
+  }, [setDocuments]);
+
 
   if (loading) {
     return <div>Loading...</div>;
@@ -69,28 +60,30 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
               </div>
             )}
 
-            {error && <div className="alert alert-danger">{error}</div>}
 
-            {driveLoggedIn && (
-              <div className="row">
-                {documents.length > 0 ? (
-                  documents.map((doc) => (
-                    <div className="col-md-4 mb-3" key={doc.id}>
+            {error && <div className="alert alert-danger">{error}</div>}
+            <div className="row">
+              {documents.length > 0 ? (
+                documents.map((doc) => (
+                  <div className="col-md-4 mb-3" key={doc.id}>
+                    <Link to={`/view/sop/${doc.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                       <div className="card p-3 view">
                         <h4>{doc.title}</h4>
-                        {doc.createdTime && <p>Created: {new Date(doc.createdTime).toLocaleDateString()}</p>}
-                        {doc.ownerName && <p>Owner: {doc.ownerName}</p>}
-                        <a href={doc.webViewLink} target="_blank" rel="noopener noreferrer">
-                          View Document
-                        </a>
+                        <p>Last Updated: {new Date(doc.updated_at).toLocaleDateString()}</p>
+                        <p>Team: {doc.team_name || 'Personal'}</p>
+                        {/*{doc.file_url && (
+                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                            Download Document
+                          </a>
+                        )}*/}
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <p>No documents available.</p>
-                )}
-              </div>
-            )}
+                    </Link>
+                  </div>
+                ))
+              ) : (
+                <p>No documents available.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

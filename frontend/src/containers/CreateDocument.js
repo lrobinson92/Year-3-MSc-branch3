@@ -31,8 +31,8 @@ const CreateDocument = ({ isAuthenticated, user }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !teamId) {
-      setError('Title and Team are required.');
+    if (!title) {
+      setError('Title is required.');
       return;
     }
     if (inputType === 'file' && !file) {
@@ -149,6 +149,8 @@ const CreateDocument = ({ isAuthenticated, user }) => {
               className="form-control"
               value={textContent}
               onChange={(e) => setTextContent(e.target.value)}
+              rows="10" // Set initial size to 10 rows
+              style={{ resize: 'vertical' }} // Allow vertical resizing
               required
             />
           </div>

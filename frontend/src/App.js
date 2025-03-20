@@ -46,9 +46,9 @@ const App = () => (
                     <Route path='/view/tasks' element={<ViewTasks />} />
                     <Route path="/edit-task/:id" element={<EditTask />} />
                     <Route path="/create-task" element={<CreateTask />} />
-                    <Route path='/view/sop' element={<ViewSOP />} />
+                    <Route path='/view/sop/:id' element={<ViewSOP />} />
                     <Route path="/create-document" element={<CreateDocument />} />
-                    <Route path='*' element={<h1>Route Not Found</h1>} />
+                    {/*<Route path='*' element={<h1>Route Not Found</h1>} />*/}
                 </Routes>            
             </Layout>
         </Router>
