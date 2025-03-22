@@ -5,6 +5,7 @@ import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
 import axiosInstance from '../utils/axiosConfig';
 import { googleDriveLogin, uploadDocument, setDocuments, setDriveLoggedIn } from '../actions/googledrive'; 
+import { formatDate } from '../utils/utils';
 
 const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn, documents, setDocuments, setDriveLoggedIn }) => {
   
@@ -69,7 +70,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
                     <Link to={`/view/sop/${doc.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                       <div className="card p-3 view">
                         <h4>{doc.title}</h4>
-                        <p>Last Updated: {new Date(doc.updated_at).toLocaleDateString()}</p>
+                        <p>Last Updated: {formatDate(doc.updated_at)}</p>
                         <p>Team: {doc.team_name || 'Personal'}</p>
                         {/*{doc.file_url && (
                           <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
