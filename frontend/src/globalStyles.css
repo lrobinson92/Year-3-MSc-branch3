@@ -410,14 +410,18 @@ ul.member-list li {
     font-size: 2em; 
 }
 
-/* Add styles for the document content */
-.document-content {
+
+
+/* Add styles for the document content 
+.document-content * {
     white-space: pre-wrap;
     word-wrap: break-word;
     color: #111049;
     font-family: 'Koh Santepheap', sans-serif; 
-    font-size: 1.25em;
-}
+    background-color: transparent !important;
+}*/
+
+
 
 /* stype to documents */
 .main-content-doc {
@@ -437,4 +441,52 @@ ul.member-list li {
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
+}
+
+/* Reset excessive margins and line-height added by Google Docs */
+.document-content p,
+.document-content ol,
+.document-content ul,
+.document-content li,
+.document-content div,
+.document-content span {
+    font-size: 1.1em;
+    font-family: 'Koh Santepheap', sans-serif;
+    color: #111049;
+    background-color: transparent !important;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.6;
+    margin-top: 0.5em !important;
+    margin-bottom: 0.5em !important;
+    padding: 0 !important;
+}
+
+/* Optional: make list spacing tighter */
+.document-content li {
+  margin-bottom: 0.3em !important;
+}
+
+.document-content h1:first-of-type,
+.document-content h2:first-of-type,
+.document-content p:first-of-type {
+    font-size: 2.25em !important;
+    font-weight: bold !important;
+    margin-bottom: 1rem !important;
+    padding-bottom: 0.5rem;
+    text-align: center;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 0.5rem;
+}
+
+.document-content h1 {
+    font-size: 2.25em !important;
+}
+  
+.document-content h2 {
+    font-size: 1.75em !important;
+}
+  
+.document-content h3 {
+    font-size: 1.5em !important;
 }

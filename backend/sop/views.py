@@ -419,21 +419,21 @@ class GoogleDriveFileContentView(APIView):
         if gfile.get('mimeType') != 'application/vnd.google-apps.document':
             return Response({"error": "This API only supports Google Docs files."}, status=400)
 
-        # Fetch the export link for plain text
+        # Fetch the export link for html, plain text removes formatting
         export_links = gfile.get('exportLinks', {})
-        text_export_link = export_links.get('text/plain')
+        html_export_link = export_links.get('text/html')
 
-        if not text_export_link:
-            logger.error("No export link available for this Google Doc.")
-            return Response({"error": "Unable to export Google Doc as text."}, status=500)
+        if not html_export_link:
+            logger.error("No HTML export link available for this Google Doc.")
+            return Response({"error": "Unable to export Google Doc as HTML."}, status=500)
 
         # Download the document content
         try:
-            response = requests.get(text_export_link)
+            response = requests.get(html_export_link)
             response.raise_for_status()  # Raise an error for failed HTTP responses
             content = response.text
         except Exception as e:
-            logger.error("Failed to download Google Docs content: %s", e, exc_info=True)
+            logger.error("Failed to download Google Docs HTML content: %s", e, exc_info=True)
             return Response({"error": "Failed to retrieve document content."}, status=500)
 
         return Response({"title":document.title, "content": content, "file_url": document.file_url}, status=200)

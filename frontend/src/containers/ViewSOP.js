@@ -14,6 +14,7 @@ const ViewSOP = ({ isAuthenticated }) => {
   const [fileUrl, setFileUrl] = useState(''); // Define the fileUrl state variable
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDocumentContent = async () => {
@@ -42,19 +43,16 @@ const ViewSOP = ({ isAuthenticated }) => {
 
   return (
     <div className="d-flex">
-      <FaArrowLeft className="back-arrow" onClick={() => Navigate('/view/documents')} />
+      <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/documents')} />
       <div className="container mt-5 entry-container">
         <div className="recent-items-card">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h2 className="document-title">{title}</h2>
             <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary create-new-link">
               Edit Document
             </a>
           </div>
           <div className="sop-detail-card">
-            <pre className="document-content">
-              {content}
-            </pre>
+          <div className="document-content" dangerouslySetInnerHTML={{ __html: content }}></div>
           </div>
         </div>
       </div>
