@@ -5,6 +5,7 @@ from django.core.mail import send_mail
 from django.db.models import Q  # Import Q
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import HttpResponseRedirect, redirect, get_object_or_404
+from django.utils.dateparse import parse_datetime
 from django.utils.decorators import method_decorator
 from django.views import View
 from pydrive2.auth import GoogleAuth
@@ -413,7 +414,16 @@ class GoogleDriveFileContentView(APIView):
 
         # Fetch file metadata, ensuring we get the export links
         gfile = drive.CreateFile({'id': file_id})
-        gfile.FetchMetadata(fields='id, title, mimeType, exportLinks')
+        gfile.FetchMetadata(fields='id, title, mimeType, modifiedDate, exportLinks')
+
+        # Update document metadata in your DB
+        document.title = gfile['title']
+
+        # Update `updated_at` using modifiedDate from Google (parse it into Django datetime format)
+        if 'modifiedDate' in gfile:
+            document.updated_at = parse_datetime(gfile['modifiedDate'])
+
+        document.save(update_fields=['title', 'updated_at'])
 
         # Check if the file is a Google Doc
         if gfile.get('mimeType') != 'application/vnd.google-apps.document':
