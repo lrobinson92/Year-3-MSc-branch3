@@ -403,3 +403,38 @@ ul.member-list li {
     opacity: 1;
 }
 
+/* Add styles for the document title */
+.document-title {
+    color: #111049;
+    font-family: 'Koh Santepheap', sans-serif;
+    font-size: 2em; 
+}
+
+/* Add styles for the document content */
+.document-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #111049;
+    font-family: 'Koh Santepheap', sans-serif; 
+    font-size: 1.25em;
+}
+
+/* stype to documents */
+.main-content-doc {
+    display: flex;
+    margin-top: 600px;
+    margin-bottom: 20px;
+    justify-content: center;
+    align-items: center;
+    height: 100vh; /* Ensure the container takes the full height of the viewport */
+}
+
+.recent-items-card-doc {
+    width: 80%;
+    max-width: 1200px; /* Set a maximum width for the card */
+    background-color: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}

@@ -387,11 +387,54 @@ class GoogleDriveFileContentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, document_id):
-        """ Return the Google Drive file URL instead of fetching content """
+        """ Retrieve content from a Google Doc and return as plain text. """
         document = get_object_or_404(Document, id=document_id)
-        
-        if not document.file_url:
-            return Response({"error": "File URL not found for this document."}, status=400)
+        file_id = document.google_drive_file_id
 
-        return Response({"file_url": document.file_url}, status=200)
+        if not file_id:
+            return Response({"error": "Document does not have an associated Google Drive file ID."}, status=400)
+
+        # Load stored credentials from session.
+        creds_json = request.session.get('google_drive_credentials')
+        if not creds_json:
+            return Response({"error": "Not authenticated with Google Drive."}, status=401)
+
+        try:
+            credentials = OAuth2Credentials.from_json(creds_json)
+        except Exception as e:
+            logger.error("Failed to load credentials: %s", e, exc_info=True)
+            return Response({"error": "Invalid Google Drive credentials."}, status=400)
+
+        # Prepare PyDrive2 authentication
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        gauth.credentials = credentials
+        drive = GoogleDrive(gauth)
+
+        # Fetch file metadata, ensuring we get the export links
+        gfile = drive.CreateFile({'id': file_id})
+        gfile.FetchMetadata(fields='id, title, mimeType, exportLinks')
+
+        # Check if the file is a Google Doc
+        if gfile.get('mimeType') != 'application/vnd.google-apps.document':
+            return Response({"error": "This API only supports Google Docs files."}, status=400)
+
+        # Fetch the export link for plain text
+        export_links = gfile.get('exportLinks', {})
+        text_export_link = export_links.get('text/plain')
+
+        if not text_export_link:
+            logger.error("No export link available for this Google Doc.")
+            return Response({"error": "Unable to export Google Doc as text."}, status=500)
+
+        # Download the document content
+        try:
+            response = requests.get(text_export_link)
+            response.raise_for_status()  # Raise an error for failed HTTP responses
+            content = response.text
+        except Exception as e:
+            logger.error("Failed to download Google Docs content: %s", e, exc_info=True)
+            return Response({"error": "Failed to retrieve document content."}, status=500)
+
+        return Response({"title":document.title, "content": content, "file_url": document.file_url}, status=200)
     

@@ -1,26 +1,31 @@
 // ViewSOP.js
 import React, { useState, useEffect } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axiosConfig';
 import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
+import '../globalStyles.css';
+import { FaArrowLeft } from 'react-icons/fa';
 
 const ViewSOP = ({ isAuthenticated }) => {
   const { id } = useParams(); // Document ID
+  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [fileUrl, setFileUrl] = useState(''); // Define the fileUrl state variable
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchDocumentContent = async () => {
       try {
-        // Optionally, you might also fetch the Document record from /api/documents/:id
         const res = await axiosInstance.get(
-          `${process.env.REACT_APP_API_URL}/api/google-drive/file-content/${id}/`,
+          `${process.env.REACT_APP_API_URL}/api/google-drive/file-content/${id}/`, 
           { withCredentials: true }
         );
-        setContent(res.data.content);
-    } catch (err) {
+        setTitle(res.data.title); // Set the document title
+        setContent(res.data.content); // Set the document content
+        setFileUrl(res.data.file_url); // Set the Google Doc URL
+      } catch (err) {
         console.error(err);
         setError('Failed to fetch document content.');
       } finally {
@@ -37,13 +42,20 @@ const ViewSOP = ({ isAuthenticated }) => {
 
   return (
     <div className="d-flex">
-      <Sidebar />
-      <div className="main-content">
-        <div className="sop-detail-card">
-          <h2>Document #{id}</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
-            {content}
-          </pre>
+      <FaArrowLeft className="back-arrow" onClick={() => Navigate('/view/documents')} />
+      <div className="container mt-5 entry-container">
+        <div className="recent-items-card">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h2 className="document-title">{title}</h2>
+            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary create-new-link">
+              Edit Document
+            </a>
+          </div>
+          <div className="sop-detail-card">
+            <pre className="document-content">
+              {content}
+            </pre>
+          </div>
         </div>
       </div>
     </div>
