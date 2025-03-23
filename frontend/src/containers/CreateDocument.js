@@ -11,6 +11,8 @@ const CreateDocument = ({ isAuthenticated, user }) => {
     const [textContent, setTextContent] = useState('');
     const [teams, setTeams] = useState([]);
     const [error, setError] = useState('');
+    const [prompt, setPrompt] = useState('');
+    const [generating, setGenerating] = useState(false);
     const navigate = useNavigate();
 
   // Optionally fetch teams that the user belongs to so they can choose which team this document is for.
@@ -44,6 +46,8 @@ const CreateDocument = ({ isAuthenticated, user }) => {
       return;
     }
 
+    
+
     const formData = new FormData();
     formData.append('title', title);
     formData.append('team_id', teamId);
@@ -72,9 +76,23 @@ const CreateDocument = ({ isAuthenticated, user }) => {
     }
   };
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
+  const handleGenerateSOP = async () => {
+    setGenerating(true);
+    try {
+      const res = await axiosInstance.post(
+        `${process.env.REACT_APP_API_URL}/api/generate-sop/`,
+        { prompt },
+        { withCredentials: true }
+      );
+      setTextContent(res.data.sop); // set the generated content as editable text
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate SOP from OpenAI.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
 
   return (
     <div className="container mt-5 entry-container">
@@ -107,6 +125,26 @@ const CreateDocument = ({ isAuthenticated, user }) => {
             ))}
           </select>
         </div>
+
+        <div className="card p-3 mb-4">
+          <h5>Need Help Starting Your SOP?</h5>
+          <textarea
+            className="form-control mb-2"
+            rows="3"
+            placeholder="Describe the SOP you want to create..."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+          <button
+            className="btn btn-outline-primary"
+            onClick={handleGenerateSOP}
+            disabled={generating || !prompt.trim()}
+          >
+            {generating ? "Generating..." : "Generate SOP with AI"}
+          </button>
+        </div>
+
+
         <div className="form-group mb-3">
           <label>Document Type</label>
           <div>

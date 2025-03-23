@@ -11,6 +11,7 @@ from django.views import View
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from oauth2client.client import OAuth2Credentials
+from openai import OpenAI
 from rest_framework import status, generics, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, BasePermission
@@ -23,6 +24,7 @@ from .serializers import TeamSerializer, TaskSerializer
 import docx2txt
 import json
 import logging
+import openai
 import os
 import requests
 import time
@@ -373,7 +375,35 @@ class GoogleDriveUploadView(APIView):
             logger.error("Error in GoogleDriveUploadView: %s", e, exc_info=True)
             return Response({"error": "An internal error occurred: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        
+
+class GenerateSOPView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        prompt = request.data.get('prompt')
+        if not prompt:
+            return Response({'error': 'Prompt is required.'}, status=400)
+
+        try:
+            client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+            completion = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "developer", "content": "You are an assistant that helps users write effective and clear Standard Operating Procedures (SOPs)."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+
+            sop_text = completion.choices[0].message.content
+            return Response({"sop": sop_text})
+
+        except Exception as e:
+            return Response({"error": f"OpenAI error: {str(e)}"}, status=500)
+
+
 class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
     
     serializer_class = DocumentSerializer
