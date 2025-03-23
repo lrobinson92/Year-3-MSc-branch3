@@ -450,15 +450,13 @@ ul.member-list li {
 .document-content li,
 .document-content div,
 .document-content span {
-    font-size: 1.1em;
     font-family: 'Koh Santepheap', sans-serif;
     color: #111049;
     background-color: transparent !important;
     white-space: pre-wrap;
     word-wrap: break-word;
-    line-height: 1.6;
+    line-height: 1;
     margin-top: 0.5em !important;
-    margin-bottom: 0.5em !important;
     padding: 0 !important;
 }
 
@@ -467,12 +465,10 @@ ul.member-list li {
   margin-bottom: 0.3em !important;
 }
 
-.document-content h1:first-of-type,
-.document-content h2:first-of-type,
-.document-content p:first-of-type {
-    font-size: 2.25em !important;
+.document-content h1:first-of-type {
+    font-size: 2em !important;
     font-weight: bold !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.5rem !important;
     padding-bottom: 0.5rem;
     text-align: center;
     border-bottom: 2px solid #ddd;
@@ -480,27 +476,23 @@ ul.member-list li {
 }
 
 .document-content h1 {
-    font-size: 2.25em !important;
+    font-size: 2em !important;
 }
   
 .document-content h2 {
-    font-size: 1.75em !important;
+    font-size: 1.5em !important;
 }
   
 .document-content h3 {
-    font-size: 1.5em !important;
+    font-size: 1.25em !important;
 }
 
-.ql-editor p {
-    margin-bottom: 1em;
-    line-height: 1.6;
-}
+
 
 .ql-editor ul,
 .ql-editor ol {
-  padding-left: 1.5em;
-  margin-bottom: 1.5em;
-  margin-top: 1em;
+  padding-left: 1em;
+
 }
 
 .ql-editor li {
@@ -519,15 +511,24 @@ ul.member-list li {
 }
 
 .ql-editor {
-    font-size: 16px;
+    font-size: 12px;
     color: #111049;
-    line-height: 1.6;
+    line-height: 1;
 }
 
-.ql-editor p + h1,
-.ql-editor p + h2,
-.ql-editor p + h3,
-.ql-editor ul + h1,
-.ql-editor ul + h2 {
-  margin-top: 1em;
+
+
+.ql-editor p,
+.ql-editor div {
+  width: 100% !important;
+  max-width: 100% !important;
+  word-break: break-word;
+  white-space: normal;
 }
+
+.ql-editor {
+    line-height: 1;
+    white-space: normal;
+    word-wrap: break-word;
+  }
+  

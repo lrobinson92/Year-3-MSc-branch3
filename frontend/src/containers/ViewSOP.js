@@ -23,7 +23,7 @@ const ViewSOP = ({ isAuthenticated }) => {
           `${process.env.REACT_APP_API_URL}/api/google-drive/file-content/${id}/`, 
           { withCredentials: true }
         );
-        setTitle(res.data.title); // Set the document title
+        //setTitle(res.data.title); // Set the document title
         setContent(res.data.content); // Set the document content
         setFileUrl(res.data.file_url); // Set the Google Doc URL
       } catch (err) {

@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import axiosInstance from '../utils/axiosConfig';
-import { marked } from 'marked';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { uploadDocument, generateSOP } from '../actions/googledrive';
 
-const CreateDocument = ({ isAuthenticated, user }) => {
-    const [title, setTitle] = useState('');
-    const [teamId, setTeamId] = useState('');
-    const [inputType, setInputType] = useState('text'); // 'file' or 'text'
-    const [file, setFile] = useState(null);
-    const [textContent, setTextContent] = useState('');
-    const [teams, setTeams] = useState([]);
-    const [error, setError] = useState('');
-    const [prompt, setPrompt] = useState('');
-    const [generating, setGenerating] = useState(false);
-    const navigate = useNavigate();
+const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) => {
+  const [title, setTitle] = useState('');
+  const [teamId, setTeamId] = useState('');
+  const [inputType, setInputType] = useState('text'); // 'file' or 'text'
+  const [file, setFile] = useState(null);
+  const [textContent, setTextContent] = useState('');
+  const [teams, setTeams] = useState([]);
+  const [error, setError] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const quillRef = useRef(null);
+  const navigate = useNavigate();
 
   // Optionally fetch teams that the user belongs to so they can choose which team this document is for.
   useEffect(() => {
@@ -49,18 +50,16 @@ const CreateDocument = ({ isAuthenticated, user }) => {
       return;
     }
 
-    
-
     const formData = new FormData();
     formData.append('title', title);
     formData.append('team_id', teamId);
     
     // Append either the file or the text content.
     if (inputType === 'file') {
-        formData.append('file', file);
-      } else {
-        formData.append('text_content', textContent);
-      }
+      formData.append('file', file);
+    } else {
+      formData.append('text_content', textContent);
+    }
 
     try {
       const res = await axiosInstance.post(
@@ -79,27 +78,15 @@ const CreateDocument = ({ isAuthenticated, user }) => {
     }
   };
 
-  const handleGenerateSOP = async () => {
-    setGenerating(true);
-    try {
-      const res = await axiosInstance.post(
-        `${process.env.REACT_APP_API_URL}/api/generate-sop/`,
-        { prompt },
-        { withCredentials: true }
-      );
-      const markdown = res.data.sop;
-      const html = marked(markdown); // Convert markdown → HTML
-
-      setTextContent(html);      // Quill editor can now render it properly
-      setInputType('text');      // Ensure the text input mode is selected
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate SOP from OpenAI.");
-    } finally {
-      setGenerating(false);
-    }
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    uploadDocument(file, title, setTextContent, setError, setInputType);
   };
 
+  const handleGenerateSOP = () => {
+    generateSOP(prompt, setTextContent, setInputType, setGenerating, setError);
+  };
 
   return (
     <div className="container mt-5 entry-container">
@@ -151,7 +138,6 @@ const CreateDocument = ({ isAuthenticated, user }) => {
           </button>
         </div>
 
-
         <div className="form-group mb-3">
           <label>Document Type</label>
           <div>
@@ -182,14 +168,15 @@ const CreateDocument = ({ isAuthenticated, user }) => {
             <label>File</label>
             <input
               type="file"
-              className="form-control"
-              onChange={(e) => setFile(e.target.files[0])}
-              required
+              accept=".docx,.txt"
+              className="form-control mb-3"
+              onChange={handleFileUpload}
             />
           </div>
         ) : (
           <div className="form-group mb-3">
             <ReactQuill
+              ref={quillRef}
               value={textContent}
               onChange={setTextContent}
               theme="snow"
@@ -205,7 +192,7 @@ const CreateDocument = ({ isAuthenticated, user }) => {
               }}
               formats={[
                 'header', 'bold', 'italic', 'underline',
-                'list', 'bullet', 'link'
+                'list', 'bullet', 'link', 'blockquote', 'code'
               ]}
             />
           </div>
@@ -223,4 +210,4 @@ const mapStateToProps = (state) => ({
   user: state.auth.user,
 });
 
-export default connect(mapStateToProps)(CreateDocument);
+export default connect(mapStateToProps, { uploadDocument, generateSOP })(CreateDocument);

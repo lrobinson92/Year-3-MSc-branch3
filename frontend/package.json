@@ -9,6 +9,7 @@
     "cra-template": "1.2.0",
     "gapi-script": "^1.2.0",
     "jwt-decode": "^4.0.0",
+    "mammoth": "^1.9.0",
     "marked": "^15.0.7",
     "react": "^18.3.1",
     "react-autosuggest": "^10.1.0",
