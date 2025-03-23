@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import axiosInstance from '../utils/axiosConfig';
+import { marked } from 'marked';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 const CreateDocument = ({ isAuthenticated, user }) => {
     const [title, setTitle] = useState('');
     const [teamId, setTeamId] = useState('');
-    const [inputType, setInputType] = useState('file'); // 'file' or 'text'
+    const [inputType, setInputType] = useState('text'); // 'file' or 'text'
     const [file, setFile] = useState(null);
     const [textContent, setTextContent] = useState('');
     const [teams, setTeams] = useState([]);
@@ -84,7 +87,11 @@ const CreateDocument = ({ isAuthenticated, user }) => {
         { prompt },
         { withCredentials: true }
       );
-      setTextContent(res.data.sop); // set the generated content as editable text
+      const markdown = res.data.sop;
+      const html = marked(markdown); // Convert markdown → HTML
+
+      setTextContent(html);      // Quill editor can now render it properly
+      setInputType('text');      // Ensure the text input mode is selected
     } catch (err) {
       console.error(err);
       alert("Failed to generate SOP from OpenAI.");
@@ -182,14 +189,24 @@ const CreateDocument = ({ isAuthenticated, user }) => {
           </div>
         ) : (
           <div className="form-group mb-3">
-            <label>Text Content</label>
-            <textarea
-              className="form-control"
+            <ReactQuill
               value={textContent}
-              onChange={(e) => setTextContent(e.target.value)}
-              rows="10" // Set initial size to 10 rows
-              style={{ resize: 'vertical' }} // Allow vertical resizing
-              required
+              onChange={setTextContent}
+              theme="snow"
+              style={{ height: '400px', marginBottom: '1rem', background: '#fff' }}
+              modules={{
+                toolbar: [
+                  [{ header: [1, 2, 3, false] }],
+                  ['bold', 'italic', 'underline'],
+                  [{ list: 'ordered' }, { list: 'bullet' }],
+                  ['link'],
+                  ['clean']
+                ],
+              }}
+              formats={[
+                'header', 'bold', 'italic', 'underline',
+                'list', 'bullet', 'link'
+              ]}
             />
           </div>
         )}

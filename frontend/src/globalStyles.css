@@ -490,3 +490,44 @@ ul.member-list li {
 .document-content h3 {
     font-size: 1.5em !important;
 }
+
+.ql-editor p {
+    margin-bottom: 1em;
+    line-height: 1.6;
+}
+
+.ql-editor ul,
+.ql-editor ol {
+  padding-left: 1.5em;
+  margin-bottom: 1.5em;
+  margin-top: 1em;
+}
+
+.ql-editor li {
+  margin-bottom: 0.5em;
+}
+
+.ql-editor li::marker,
+.ql-editor li {
+    color: #111049;
+    font-weight: 400;
+}
+
+.ql-editor * {
+    color: #111049 !important;
+    background-color: transparent !important;
+}
+
+.ql-editor {
+    font-size: 16px;
+    color: #111049;
+    line-height: 1.6;
+}
+
+.ql-editor p + h1,
+.ql-editor p + h2,
+.ql-editor p + h3,
+.ql-editor ul + h1,
+.ql-editor ul + h2 {
+  margin-top: 1em;
+}
