@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import TeamViewSet, UsersInSameTeamView, TaskViewSet, GoogleDriveLoginView, GoogleDriveCallbackView, ListDriveFilesView, GoogleDriveUploadView, DocumentViewSet, GoogleDriveFileContentView, GenerateSOPView
+from .views import TeamViewSet, UsersInSameTeamView, TaskViewSet, GoogleDriveLoginView, GoogleDriveCallbackView, ListDriveFilesView, GoogleDriveUploadView, DocumentViewSet, GoogleDriveFileContentView, GenerateSOPView, SummariseSOPView, ImproveSOPView
 
 router = DefaultRouter()
 router.register(r'teams', TeamViewSet, basename='team')
@@ -16,4 +16,6 @@ urlpatterns = [
     path('google-drive/upload/', GoogleDriveUploadView.as_view(), name='google_drive_upload'),
     path('google-drive/file-content/<int:document_id>/', GoogleDriveFileContentView.as_view(), name='google_drive_file_content'),
     path('generate-sop/', GenerateSOPView.as_view(), name='generate_sop'),
+    path('summarise-sop/', SummariseSOPView.as_view(), name='summarise_sop'),
+    path('improve-sop/', ImproveSOPView.as_view(), name='improve_sop'),
 ]

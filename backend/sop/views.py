@@ -404,6 +404,60 @@ class GenerateSOPView(APIView):
             return Response({"error": f"OpenAI error: {str(e)}"}, status=500)
 
 
+class SummariseSOPView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        content = request.data.get('content', '')
+        if not content:
+            return Response({'error': 'No content provided'}, status=400)
+
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Summarise the following SOP as clearly and concisely as possible."},
+                {"role": "user", "content": content}
+            ],
+            max_tokens=300
+        )
+        summary = response.choices[0].message.content
+        return Response({'summary': summary})
+
+
+class ImproveSOPView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        content = request.data.get('content', '')
+        if not content:
+            return Response({'error': 'No content provided.'}, status=400)
+
+        try:
+            client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+            completion = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that improves Standard Operating Procedures (SOPs) for clarity, structure, and tone."},
+                    {"role": "user", "content": f"Please improve this SOP:\n\n{content}"}
+                ],
+                temperature=0.7,
+                max_tokens=1500
+            )
+
+            improved = completion.choices[0].message.content
+            return Response({"improved": improved})
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+
+
+
+
+
+
 class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
     
     serializer_class = DocumentSerializer

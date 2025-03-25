@@ -41,19 +41,22 @@ export const uploadDocument = (file, title, setTextContent, setError, setInputTy
 };
 
 // Action to generate SOP
-export const generateSOP = (prompt, setTextContent, setInputType, setGenerating, setError) => async dispatch => {
+export const generateSOP = (prompt, quillRef, setTextContent, setInputType, setGenerating, setError) => async dispatch => {
     setGenerating(true);
+
     try {
         const res = await axiosInstance.post(
-            `${process.env.REACT_APP_API_URL}/api/generate-sop/`,
+            '/api/generate-sop/',
             { prompt },
             { withCredentials: true }
         );
-        const markdown = res.data.sop;
-        const html = marked(markdown); // Convert markdown → HTML
+        const html = res.data.sop;
+        const quill = quillRef.current.getEditor();
+        const delta = quill.clipboard.convert(html);
+        quill.setContents(delta);
 
-        setTextContent(html);      // Quill editor can now render it properly
-        setInputType('text');      // Ensure the text input mode is selected
+        setTextContent(html); // Set the text content
+        setInputType('text'); // Ensure the text input mode is selected
 
         dispatch({
             type: GENERATE_SOP_SUCCESS,
@@ -61,7 +64,7 @@ export const generateSOP = (prompt, setTextContent, setInputType, setGenerating,
         });
     } catch (err) {
         console.error(err);
-        setError("Failed to generate SOP from OpenAI.");
+        setError('Failed to generate SOP.');
         dispatch({
             type: GENERATE_SOP_FAIL
         });
@@ -87,4 +90,3 @@ export const setDriveLoggedIn = (status) => dispatch => {
 };
 
 
-  

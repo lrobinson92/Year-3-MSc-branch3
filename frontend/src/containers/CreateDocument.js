@@ -5,19 +5,41 @@ import axiosInstance from '../utils/axiosConfig';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { uploadDocument, generateSOP } from '../actions/googledrive';
+import { FaArrowLeft } from 'react-icons/fa';
+import '../globalStyles.css'; // Ensure the global styles are imported
 
 const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) => {
   const [title, setTitle] = useState('');
   const [teamId, setTeamId] = useState('');
-  const [inputType, setInputType] = useState('text'); // 'file' or 'text'
-  const [file, setFile] = useState(null);
-  const [textContent, setTextContent] = useState('');
   const [teams, setTeams] = useState([]);
-  const [error, setError] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [inputType, setInputType] = useState('');
+  const [textContent, setTextContent] = useState('');
+  const [error, setError] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const quillRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+
   const navigate = useNavigate();
+
+  const adjustEditorHeight = () => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor) return;
+  
+    const scrollHeight = editor.root.scrollHeight;
+  
+    // Access the DOM element for the outer container
+    const quillNode = quillRef.current?.editor?.getBoundingClientRect
+      ? quillRef.current.editor
+      : document.querySelector('.ql-container');
+  
+    if (quillNode) {
+      quillNode.style.height = scrollHeight + 50 + 'px';
+    }
+  };
+  
 
   // Optionally fetch teams that the user belongs to so they can choose which team this document is for.
   useEffect(() => {
@@ -41,25 +63,15 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
       setError('Title is required.');
       return;
     }
-    if (inputType === 'file' && !file) {
-      setError('Please select a file.');
+    if (!textContent) {
+      setError('Please enter or upload some content.');
       return;
     }
-    if (inputType === 'text' && !textContent) {
-      setError('Please enter some text.');
-      return;
-    }
-
+    
     const formData = new FormData();
     formData.append('title', title);
     formData.append('team_id', teamId);
-    
-    // Append either the file or the text content.
-    if (inputType === 'file') {
-      formData.append('file', file);
-    } else {
-      formData.append('text_content', textContent);
-    }
+    formData.append('text_content', textContent);
 
     try {
       const res = await axiosInstance.post(
@@ -81,37 +93,77 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // reset the file input so same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    setSelectedFile(file);
     uploadDocument(file, title, setTextContent, setError, setInputType);
   };
 
   const handleGenerateSOP = () => {
-    generateSOP(prompt, setTextContent, setInputType, setGenerating, setError);
+    generateSOP(prompt, quillRef, setTextContent, setInputType, setGenerating, setError);
   };
+
+  const handleImproveSOP = async () => {
+    try {
+      const res = await axiosInstance.post(
+        '/api/improve-sop/',
+        { content: textContent },
+        { withCredentials: true }
+      );
+      const improvedHtml = res.data.improved;
+      const quill = quillRef.current.getEditor();
+      const delta = quill.clipboard.convert(improvedHtml);
+      quill.setContents(delta);
+    } catch (err) {
+      console.error(err);
+      setError('Could not improve SOP.');
+    }
+  };
+  
+  const handleSummariseSOP = async () => {
+    try {
+      const res = await axiosInstance.post(
+        '/api/summarise-sop/',
+        { content: textContent },
+        { withCredentials: true }
+      );
+      alert(`Summary:\n\n${res.data.summary}`);
+    } catch (err) {
+      console.error(err);
+      setError('Could not summarise SOP.');
+    }
+  };
+  
 
   return (
     <div className="container mt-5 entry-container">
-      <h2>Create New Document</h2>
-      {error && <div className="alert alert-danger">{error}</div>}
-      <form onSubmit={handleSubmit}>
-        <div className="form-group mb-3">
-          <label>Title</label>
+      <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/documents')} />
+      <div className="card create-document-card p-4 w-100" style={{ maxWidth: '1200px' }}>
+        <h4 className="mb-4">Create Document</h4>
+
+        {error && <div className="alert alert-danger">{error}</div>}
+
+        <div className="mb-4">
           <input
             type="text"
             className="form-control"
+            placeholder="Untitled"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            required
           />
         </div>
-        <div className="form-group mb-3">
-          <label>Team</label>
+
+        <div className="mb-4">
           <select
-            className="form-control"
+            className="form-select"
             value={teamId}
             onChange={(e) => setTeamId(e.target.value)}
-            required
           >
-            <option value="">Select Team</option>
+            <option value="">Select a team</option>
             {teams.map((team) => (
               <option key={team.id} value={team.id}>
                 {team.name}
@@ -120,90 +172,114 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           </select>
         </div>
 
-        <div className="card p-3 mb-4">
-          <h5>Need Help Starting Your SOP?</h5>
+        <div className="border rounded p-3 mb-4 bg-light-subtle" style={{ padding: '1.5rem' }}>
+          <p className="fw-semibold mb-2">
+            <span role="img" aria-label="spark">✨</span> Create an SOP with AI
+          </p>
           <textarea
             className="form-control mb-2"
-            rows="3"
-            placeholder="Describe the SOP you want to create..."
+            rows="2"
+            placeholder="Include any specific details or prompts you want the AI to consider"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
-          <button
-            className="btn btn-outline-primary"
-            onClick={handleGenerateSOP}
-            disabled={generating || !prompt.trim()}
-          >
-            {generating ? "Generating..." : "Generate SOP with AI"}
-          </button>
-        </div>
-
-        <div className="form-group mb-3">
-          <label>Document Type</label>
-          <div>
-            <label className="me-3">
-              <input
-                type="radio"
-                name="inputType"
-                value="file"
-                checked={inputType === 'file'}
-                onChange={() => setInputType('file')}
-              />{' '}
-              Upload File
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <label htmlFor="fileUpload" className="btn btn-outline-primary btn-sm flex-grow-0">
+              Choose File
             </label>
-            <label>
-              <input
-                type="radio"
-                name="inputType"
-                value="text"
-                checked={inputType === 'text'}
-                onChange={() => setInputType('text')}
-              />{' '}
-              Enter Text
-            </label>
-          </div>
-        </div>
-        {inputType === 'file' ? (
-          <div className="form-group mb-3">
-            <label>File</label>
             <input
               type="file"
-              accept=".docx,.txt"
-              className="form-control mb-3"
+              id="fileUpload"
+              ref={fileInputRef}
               onChange={handleFileUpload}
+              accept=".docx,.txt"
+              style={{ display: 'none' }}
             />
+            {selectedFile && (
+              <div className="d-flex align-items-center gap-2 mt-2">
+                <span className="text-muted">Selected File: {selectedFile.name}</span>
+                <button
+                  className="btn btn-outline-danger btn-sm flex-grow-0"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setTextContent('');
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            <div className="ms-auto d-flex gap-2">
+              <button className="btn btn-primary btn-sm flex-grow-0" onClick={handleGenerateSOP} disabled={generating}>
+                {generating ? 'Generating...' : 'Generate SOP'}
+              </button>
+              <div className="dropdown">
+                <button
+                  className="btn btn-outline-secondary btn-sm dropdown-toggle flex-grow-0"
+                  type="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  AI Actions
+                </button>
+                <ul className="dropdown-menu">
+                  <li>
+                    <button className="dropdown-item" onClick={handleImproveSOP}>
+                      ✨ Improve SOP
+                    </button>
+                  </li>
+                  <li>
+                    <button className="dropdown-item" onClick={handleSummariseSOP}>
+                      📄 Summarise SOP
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="form-group mb-3">
+        </div>
+
+          <div className="mb-4" style={{ marginBottom: '2rem' }}>
             <ReactQuill
               ref={quillRef}
               value={textContent}
-              onChange={setTextContent}
+              onChange={(content) => {
+                setTextContent(content);
+                adjustEditorHeight();
+              }}
               theme="snow"
-              style={{ height: '400px', marginBottom: '1rem', background: '#fff' }}
+              style={{
+                minHeight: '300px',
+                backgroundColor: '#fff',
+                marginBottom: '2rem',
+                transition: 'height 0.2s ease',
+                maxHeight: '1500px',
+              }}
               modules={{
                 toolbar: [
                   [{ header: [1, 2, 3, false] }],
                   ['bold', 'italic', 'underline'],
                   [{ list: 'ordered' }, { list: 'bullet' }],
                   ['link'],
-                  ['clean']
+                  ['clean'],
                 ],
               }}
-              formats={[
-                'header', 'bold', 'italic', 'underline',
-                'list', 'bullet', 'link', 'blockquote', 'code'
-              ]}
+              formats={['header', 'bold', 'italic', 'underline', 'list', 'bullet', 'link']}
             />
           </div>
-        )}
-        <button type="submit" className="btn btn-primary">
-          Create Document
-        </button>
-      </form>
-    </div>
-  );
-};
+
+          <div className="text-end mt-3">
+            <button className="btn btn-success px-4" onClick={handleSubmit}>
+              Create Document
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
 const mapStateToProps = (state) => ({
   isAuthenticated: state.auth.isAuthenticated,
