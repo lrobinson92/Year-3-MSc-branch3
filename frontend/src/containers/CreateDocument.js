@@ -22,7 +22,9 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const [summary, setSummary] = useState('');
   const [summarising, setSummarising] = useState(false);
   const [improving, setImproving] = useState(false);
-
+  const [originalContent, setOriginalContent] = useState('');
+  const [improvedContent, setImprovedContent] = useState('');
+  const [showingPreview, setShowingPreview] = useState(false);
 
   const quillRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -81,6 +83,14 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   };
 
   const handleFileUpload = (e) => {
+      // Hide any existing preview
+    setShowingPreview(false);
+    setOriginalContent('');
+    setImprovedContent('');
+    
+    // Reset summary as well
+    setSummary('');
+
     const file = e.target.files[0];
     if (!file) return;
 
@@ -94,21 +104,44 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   };
 
   const handleGenerateSOP = () => {
+
+    // Hide any existing preview
+    setShowingPreview(false);
+    setOriginalContent('');
+    setImprovedContent('');
+    
+    // Reset summary as well
+    setSummary('');
+
     generateSOP(prompt, quillRef, setTextContent, setInputType, setGenerating, setError);
   };
 
   const handleImproveSOP = async () => {
+      // Hide any existing summary
+    setSummary('');
+    
+    // Reset existing preview (if any)
+    setShowingPreview(false);
+    setOriginalContent('');
+    setImprovedContent('');
+  
     setImproving(true);
     try {
+      // Store the original content before improving
+      setOriginalContent(textContent);
+      
       const res = await axiosInstance.post(
         '/api/improve-sop/',
         { content: textContent },
         { withCredentials: true }
       );
+      
+      // Store the improved content
       const improvedHtml = formatMarkdownToHTML(res.data.improved);
-      const quill = quillRef.current.getEditor();
-      const delta = quill.clipboard.convert(improvedHtml);
-      quill.setContents(delta);
+      setImprovedContent(improvedHtml);
+      
+      // Show the preview instead of directly applying changes
+      setShowingPreview(true);
     } catch (err) {
       console.error(err);
       setError('Could not improve SOP.');
@@ -116,8 +149,38 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
       setImproving(false);
     }
   };
+
+  const acceptImprovedSOP = () => {
+    // Apply the improved content
+    const quill = quillRef.current.getEditor();
+    const delta = quill.clipboard.convert(improvedContent);
+    quill.setContents(delta);
+    setTextContent(improvedContent);
+    
+    // Reset the preview state
+    setShowingPreview(false);
+    setOriginalContent('');
+    setImprovedContent('');
+  };
+  
+  const discardImprovedSOP = () => {
+    // Keep the original content
+    // No need to update the editor since we never changed it
+    
+    // Reset the preview state
+    setShowingPreview(false);
+    setOriginalContent('');
+    setImprovedContent('');
+  };
+
+
   
   const handleSummariseSOP = async () => {
+  // Hide any existing preview
+    setShowingPreview(false);
+    setOriginalContent('');
+    setImprovedContent('');
+
     setSummarising(true);
     try {
       const res = await axiosInstance.post(
@@ -282,34 +345,63 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           )}
         </div>
 
-          <div className="mb-4" style={{ marginBottom: '2rem' }}>
-            <ReactQuill
-              ref={quillRef}
-              value={textContent}
-              onChange={(content) => {
-                setTextContent(content);
-              }}
-              theme="snow"
-              style={{
-                minHeight: '300px',
-                backgroundColor: '#fff',
-                marginBottom: '2rem',
-                transition: 'height 0.2s ease',
-                maxHeight: '600px',
-                overflowY: 'auto',
-              }}
-              modules={{
-                toolbar: [
-                  [{ header: [1, 2, 3, false] }],
-                  ['bold', 'italic', 'underline'],
-                  [{ list: 'ordered' }, { list: 'bullet' }],
-                  ['link'],
-                  ['clean'],
-                ],
-              }}
-              formats={['header', 'bold', 'italic', 'underline', 'list', 'bullet', 'link']}
-            />
+        {/* Improved SOP Preview - MOVED HERE */}
+        {showingPreview && improvedContent && (
+          <div className="mt-4 mb-4">
+            <div className="alert alert-info">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h6 className="mb-0">✨ Improved SOP Preview</h6>
+                <div className="d-flex gap-2">
+                  <button 
+                    className="btn btn-success btn-sm"
+                    onClick={acceptImprovedSOP}
+                  >
+                    Accept Changes
+                  </button>
+                  <button 
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={discardImprovedSOP}
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+              
+              <div className="border rounded p-3 bg-white" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <div dangerouslySetInnerHTML={{ __html: improvedContent }} />
+              </div>
+            </div>
           </div>
+        )}
+
+        <div className="mb-4" style={{ marginBottom: '2rem' }}>
+          <ReactQuill
+            ref={quillRef}
+            value={textContent}
+            onChange={(content) => {
+              setTextContent(content);
+            }}
+            theme="snow"
+            style={{
+              minHeight: '300px',
+              backgroundColor: '#fff',
+              marginBottom: '2rem',
+              transition: 'height 0.2s ease',
+              maxHeight: '600px',
+              overflowY: 'auto',
+            }}
+            modules={{
+              toolbar: [
+                [{ header: [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline'],
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                ['link'],
+                ['clean'],
+              ],
+            }}
+            formats={['header', 'bold', 'italic', 'underline', 'list', 'bullet', 'link']}
+          />
+        </div>
 
           <div className="text-end mt-5 mb-2">
             <button className="btn btn-success px-4" onClick={handleSubmit}>

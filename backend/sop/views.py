@@ -439,7 +439,7 @@ class ImproveSOPView(APIView):
             completion = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that improves Standard Operating Procedures (SOPs) for clarity, structure, and tone."},
+                    {"role": "system", "content": "You are a helpful assistant that improves Standard Operating Procedures (SOPs) for clarity, formality, and tone."},
                     {"role": "user", "content": f"Please improve this SOP:\n\n{content}"}
                 ],
                 temperature=0.7,
