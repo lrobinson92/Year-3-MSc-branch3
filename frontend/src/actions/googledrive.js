@@ -1,7 +1,7 @@
 import axiosInstance from '../utils/axiosConfig';
 import { marked } from 'marked';
 import mammoth from 'mammoth';
-import { combineShortParagraphs } from '../utils/utils';
+import { combineShortParagraphs, formatMarkdownToHTML } from '../utils/utils';
 import { UPLOAD_DOCUMENT_SUCCESS, UPLOAD_DOCUMENT_FAIL, SET_DOCUMENTS, SET_DRIVE_LOGGED_IN, GENERATE_SOP_SUCCESS, GENERATE_SOP_FAIL } from './types';
 
 // Action to initiate Google Drive login
@@ -22,21 +22,37 @@ export const uploadDocument = (file, title, setTextContent, setError, setInputTy
         try {
             const arrayBuffer = await file.arrayBuffer();
             const result = await mammoth.convertToHtml({ arrayBuffer });
-
             const cleaned = combineShortParagraphs(result.value);
             setTextContent(cleaned);
 
-            dispatch({
-                type: UPLOAD_DOCUMENT_SUCCESS,
-                payload: result.value
-            });
+            dispatch({ type: UPLOAD_DOCUMENT_SUCCESS, payload: result.value });
         } catch (err) {
             console.error('Error reading .docx file:', err);
             setError('Unable to read DOCX file.');
-            dispatch({
-                type: UPLOAD_DOCUMENT_FAIL
-            });
+            dispatch({ type: UPLOAD_DOCUMENT_FAIL });
         }
+    } else if (fileExt === 'txt') {
+        try {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const plainText = e.target.result;
+                const html = plainText
+                    .split('\n')
+                    .map((line) => `<p>${line.trim()}</p>`)
+                    .join('');
+                setTextContent(html);
+
+                dispatch({ type: UPLOAD_DOCUMENT_SUCCESS, payload: html });
+            };
+            reader.readAsText(file);
+        } catch (err) {
+            console.error('Error reading .txt file:', err);
+            setError('Unable to read TXT file.');
+            dispatch({ type: UPLOAD_DOCUMENT_FAIL });
+        }
+    } else {
+        setError('Unsupported file type. Only .docx and .txt are supported.');
+        dispatch({ type: UPLOAD_DOCUMENT_FAIL });
     }
 };
 
@@ -50,12 +66,12 @@ export const generateSOP = (prompt, quillRef, setTextContent, setInputType, setG
             { prompt },
             { withCredentials: true }
         );
-        const html = res.data.sop;
+        const html = formatMarkdownToHTML(res.data.sop);
         const quill = quillRef.current.getEditor();
         const delta = quill.clipboard.convert(html);
         quill.setContents(delta);
 
-        setTextContent(html); // Set the text content
+        setTextContent(delta); // Set the text content
         setInputType('text'); // Ensure the text input mode is selected
 
         dispatch({

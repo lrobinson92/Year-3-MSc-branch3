@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import axiosInstance from '../utils/axiosConfig';
+import { formatMarkdownToHTML } from '../utils/utils';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { uploadDocument, generateSOP } from '../actions/googledrive';
@@ -18,27 +19,16 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const [error, setError] = useState('');
   const [generating, setGenerating] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [summary, setSummary] = useState('');
+  const [summarising, setSummarising] = useState(false);
+  const [improving, setImproving] = useState(false);
+
+
   const quillRef = useRef(null);
   const fileInputRef = useRef(null);
 
 
   const navigate = useNavigate();
-
-  const adjustEditorHeight = () => {
-    const editor = quillRef.current?.getEditor();
-    if (!editor) return;
-  
-    const scrollHeight = editor.root.scrollHeight;
-  
-    // Access the DOM element for the outer container
-    const quillNode = quillRef.current?.editor?.getBoundingClientRect
-      ? quillRef.current.editor
-      : document.querySelector('.ql-container');
-  
-    if (quillNode) {
-      quillNode.style.height = scrollHeight + 50 + 'px';
-    }
-  };
   
 
   // Optionally fetch teams that the user belongs to so they can choose which team this document is for.
@@ -108,35 +98,42 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   };
 
   const handleImproveSOP = async () => {
+    setImproving(true);
     try {
       const res = await axiosInstance.post(
         '/api/improve-sop/',
         { content: textContent },
         { withCredentials: true }
       );
-      const improvedHtml = res.data.improved;
+      const improvedHtml = formatMarkdownToHTML(res.data.improved);
       const quill = quillRef.current.getEditor();
       const delta = quill.clipboard.convert(improvedHtml);
       quill.setContents(delta);
     } catch (err) {
       console.error(err);
       setError('Could not improve SOP.');
+    } finally {
+      setImproving(false);
     }
   };
   
   const handleSummariseSOP = async () => {
+    setSummarising(true);
     try {
       const res = await axiosInstance.post(
         '/api/summarise-sop/',
         { content: textContent },
         { withCredentials: true }
       );
-      alert(`Summary:\n\n${res.data.summary}`);
+      setSummary(res.data.summary);
     } catch (err) {
       console.error(err);
       setError('Could not summarise SOP.');
+    } finally {
+      setSummarising(false);
     }
   };
+  
   
 
   return (
@@ -232,14 +229,57 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                     </button>
                   </li>
                   <li>
-                    <button className="dropdown-item" onClick={handleSummariseSOP}>
-                      📄 Summarise SOP
-                    </button>
+                  <button className="dropdown-item" onClick={handleSummariseSOP}>
+                    📄 Summarise SOP
+                  </button>
                   </li>
                 </ul>
               </div>
             </div>
           </div>
+
+
+          {/* Spinner for Improving SOP */}
+          {improving && (
+            <div className="mt-3 text-muted d-flex align-items-center gap-2">
+              <div className="spinner-border spinner-border-sm text-secondary" role="status" />
+              <span>Improving SOP...</span>
+            </div>
+          )}
+          {summarising && (
+            <div className="mt-3 text-muted d-flex align-items-center gap-2">
+              <div className="spinner-border spinner-border-sm text-secondary" role="status" />
+              <span>Summarising SOP...</span>
+            </div>
+          )}
+
+          {/* Summary Alert Section */}
+          {summary && (
+            <div className="alert alert-info mt-4">
+              <h6>📄 Summary</h6>
+              <p style={{ whiteSpace: 'pre-wrap' }}>{summary}</p>
+              <div className="d-flex gap-2 mt-2">
+                <button
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() => {
+                    const quill = quillRef.current.getEditor();
+                    const summaryDelta = quill.clipboard.convert(`<h2>Summary:</h2><p>${summary}</p><br/><br/>`);
+                    const current = quill.getContents();
+                    quill.setContents([...summaryDelta.ops, ...current.ops]);
+                    setSummary('');
+                  }}
+                >
+                  Insert at Top
+                </button>
+                <button
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={() => setSummary('')}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
           <div className="mb-4" style={{ marginBottom: '2rem' }}>
@@ -248,7 +288,6 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
               value={textContent}
               onChange={(content) => {
                 setTextContent(content);
-                adjustEditorHeight();
               }}
               theme="snow"
               style={{
@@ -256,7 +295,8 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                 backgroundColor: '#fff',
                 marginBottom: '2rem',
                 transition: 'height 0.2s ease',
-                maxHeight: '1500px',
+                maxHeight: '600px',
+                overflowY: 'auto',
               }}
               modules={{
                 toolbar: [
@@ -271,7 +311,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
             />
           </div>
 
-          <div className="text-end mt-3">
+          <div className="text-end mt-5 mb-2">
             <button className="btn btn-success px-4" onClick={handleSubmit}>
               Create Document
             </button>
