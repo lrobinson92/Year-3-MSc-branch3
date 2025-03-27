@@ -8,7 +8,7 @@ import { FaArrowLeft } from 'react-icons/fa';
 const CreateTask = ({ createTask, isAuthenticated, user }) => {
     const [formData, setFormData] = useState({
         description: '',
-        assigned_to: '', // Will be updated based on the team or user
+        assigned_to: user ? user.id : '',
         team: '',
         due_date: '',
         status: 'not_started',
@@ -52,7 +52,30 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
         fetchUsers();
     }, [team, user]);
 
-    const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    useEffect(() => {
+        if (user) {
+            setFormData(prevFormData => ({
+                ...prevFormData,
+                assigned_to: user.id
+            }));
+        }
+    }, [user]);
+
+    const onChange = (e) => {
+        const { name, value } = e.target;
+        
+        // If team field is changed
+        if (name === 'team') {
+            setFormData({ 
+                ...formData, 
+                [name]: value,
+                // Reset assigned_to when team changes
+                assigned_to: value ? '' : (user ? user.id : '')
+            });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
+    };
 
     const onSubmit = async (e) => {
         e.preventDefault();
@@ -87,14 +110,14 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                         />
                     </div>
                     <div className="form-group mb-3">
-                        <label>Team</label>
+                        <label>Team (Optional)</label>
                         <select
                             className="form-control"
                             name="team"
                             value={team}
                             onChange={onChange}
                         >
-                            <option value="">Select Team</option>
+                            <option value="">Personal Task</option>
                             {teams.map(team => (
                                 <option key={team.id} value={team.id}>{team.name}</option>
                             ))}
@@ -110,6 +133,9 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                             required
                         >
                             <option value="">Select Member</option>
+                            {!team && user && (
+                                <option value={user.id}>{user.name}</option>
+                            )}
                             {filteredUsers.map(user => (
                                 <option key={user.user} value={user.user}>
                                     {user.user_name}

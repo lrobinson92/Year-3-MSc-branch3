@@ -265,18 +265,20 @@ class GoogleDriveUploadView(APIView):
         try:
             # Get title, team id, and file/text from the request.
             title = request.data.get('title')
-            team_id = request.data.get('team_id')
+            team_id = request.data.get('team_id', None)
             file_obj = request.FILES.get('file')
             text_content = request.data.get('text_content')
             
-            if not title or not team_id:
-                return Response({"error": "Title and team are required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not title:
+                return Response({"error": "Title is required."}, status=status.HTTP_400_BAD_REQUEST)
             
             if not file_obj and not text_content:
                 return Response({"error": "You must provide either a file or text content."}, status=status.HTTP_400_BAD_REQUEST)
             
             # Retrieve the team (if not provided, you could default to None for a personal document)
-            team = get_object_or_404(Team, id=team_id) if team_id else None
+            team = None
+            if team_id:
+                team = get_object_or_404(Team, id=team_id)
             
             # Prepare Google Auth with PyDrive2
             gauth = GoogleAuth()
@@ -454,10 +456,6 @@ class ImproveSOPView(APIView):
 
 
 
-
-
-
-
 class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
     
     serializer_class = DocumentSerializer
@@ -466,7 +464,9 @@ class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        return Document.objects.filter(Q(team__in=user.teams.all()) | Q(owner=user, team__isnull=True))
+        return Document.objects.filter(
+            Q(team__in=user.teams.all()) | 
+            Q(owner=user, team__isnull=True))
     
 class GoogleDriveFileContentView(APIView):
     permission_classes = [IsAuthenticated]

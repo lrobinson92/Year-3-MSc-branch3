@@ -11,7 +11,7 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
 
     const [formData, setFormData] = useState({
         description: '',
-        assigned_to: '',
+        assigned_to: user ? user.id : '',
         team: '',
         due_date: '',
         status: 'not_started',
@@ -87,14 +87,30 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                     console.error('Failed to fetch users:', err);
                 }
             } else {
-                setFilteredUsers(user ? [user] : []);
+                setFilteredUsers([{
+                    user: user.id,
+                    user_name: `${user.name || user.email}`
+                }]);
             }
         };
 
         fetchUsers();
     }, [team, user]);
 
-    const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const onChange = (e) => {
+        const { name, value } = e.target;
+        
+        if (name === 'team') {
+            setFormData({ 
+                ...formData, 
+                [name]: value,
+                // Reset assigned_to when team changes
+                assigned_to: value ? '' : (user ? user.id : '')
+            });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
+    };
 
     const onSubmit = async (e) => {
         e.preventDefault();
@@ -132,7 +148,7 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                         />
                     </div>
                     <div className="form-group mb-3">
-                        <label>Team</label>
+                        <label>Team (Optional)</label>
                         <select
                             className="form-control"
                             name="team"
@@ -140,7 +156,7 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                             onChange={onChange}
                             disabled={!canEdit}
                         >
-                            <option value="">Select Team</option>
+                            <option value="">Personal Task</option>
                             {teams.map(team => (
                                 <option key={team.id} value={team.id}>
                                     {team.name}

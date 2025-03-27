@@ -517,7 +517,26 @@ ul.member-list li {
     line-height: 1;
 }
 
-
+.ql-editor h1, .ql-editor h2, .ql-editor h3, .ql-editor h4 {
+    margin-top: 2rem !important;
+    margin-bottom: 1rem !important;
+    font-weight: bold !important;
+  }
+  
+  .ql-editor h1 {
+    font-size: 2.25rem !important;
+    color: #333 !important;
+  }
+  
+  .ql-editor h2 {
+    font-size: 1.75rem !important;
+    color: #444 !important;
+  }
+  
+  .ql-editor h3 {
+    font-size: 1.5rem !important;
+    color: #555 !important;
+  }
 
 .ql-editor p,
 .ql-editor div {
@@ -525,6 +544,7 @@ ul.member-list li {
   max-width: 100% !important;
   word-break: break-word;
   white-space: normal;
+  margin-bottom: 1rem !important;
 }
 
 .ql-editor {

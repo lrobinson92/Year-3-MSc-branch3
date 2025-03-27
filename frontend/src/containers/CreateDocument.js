@@ -25,6 +25,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const [originalContent, setOriginalContent] = useState('');
   const [improvedContent, setImprovedContent] = useState('');
   const [showingPreview, setShowingPreview] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const quillRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -59,10 +60,16 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
       setError('Please enter or upload some content.');
       return;
     }
+
+    setCreating(true);
     
     const formData = new FormData();
     formData.append('title', title);
-    formData.append('team_id', teamId);
+
+    if (teamId) {
+      formData.append('team_id', teamId);
+    }
+
     formData.append('text_content', textContent);
 
     try {
@@ -79,6 +86,8 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
     } catch (err) {
       console.error(err);
       setError('Failed to create document.');
+    } finally {
+      setCreating(false); // Reset loading state regardless of outcome
     }
   };
 
@@ -153,8 +162,12 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const acceptImprovedSOP = () => {
     // Apply the improved content
     const quill = quillRef.current.getEditor();
-    const delta = quill.clipboard.convert(improvedContent);
-    quill.setContents(delta);
+  
+    // Clear existing content
+    quill.setText('');
+    
+    // Insert the HTML directly at position 0 (beginning of editor)
+    quill.clipboard.dangerouslyPasteHTML(0, improvedContent);
     setTextContent(improvedContent);
     
     // Reset the preview state
@@ -219,11 +232,12 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
 
         <div className="mb-4">
           <select
+            id="teamSelect"
             className="form-select"
             value={teamId}
             onChange={(e) => setTeamId(e.target.value)}
           >
-            <option value="">Select a team</option>
+            <option value="">Personal Document (No Team)</option>
             {teams.map((team) => (
               <option key={team.id} value={team.id}>
                 {team.name}
@@ -403,11 +417,22 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           />
         </div>
 
-          <div className="text-end mt-5 mb-2">
-            <button className="btn btn-success px-4" onClick={handleSubmit}>
-              Create Document
-            </button>
-          </div>
+        <div className="text-end mt-5 mb-2">
+          <button 
+            className="btn btn-success px-4" 
+            onClick={handleSubmit}
+            disabled={creating} // Disable button while creating
+          >
+            {creating ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Creating...
+              </>
+            ) : (
+              'Create Document'
+            )}
+          </button>
+        </div>
         </div>
       </div>
     );

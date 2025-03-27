@@ -76,3 +76,6 @@ class DocumentSerializer(serializers.ModelSerializer):
             'created_at', 
             'updated_at'
         ]
+
+    def get_team_name(self, obj):
+        return obj.team.name if obj.team else "Personal"
