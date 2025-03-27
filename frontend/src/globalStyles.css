@@ -55,6 +55,20 @@ h1, h2, h3, h4, h5, h6 {
     margin-right: 10px; /* Space between circle and greeting */
 }
 
+
+
+ul.member-list li {
+    /* Remove the margin-right that's preventing overlap */
+    display: flex; /* Ensure the li content is properly aligned */
+    align-items: center;
+    position: relative; /* For tooltip positioning */
+}
+
+/* Make the member circles slightly overlap for a team feel */
+.member-list li:not(:first-child) {
+    margin-left: -16px;
+}
+
 /* Circle with initial */
 .member-initial {
     display: inline-block;
@@ -69,6 +83,21 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: bold;
     margin-right: 10px; /* Space between circle and text */
     position: relative;
+    z-index: 1;
+    transition: all 0.2s ease; /* Smooth hover effect */
+    border: 1px solid white;
+}
+
+/* Hover effect for member initials */
+.member-initial:hover {
+    transform: scale(1.1);
+    z-index: 5;
+}
+
+.owner-initial {
+    background-color: #615fd8;
+    border: 1px solid white;
+    z-index: 2;
 }
 
 /* Tooltip */
@@ -96,9 +125,7 @@ ul.member-list {
     flex-wrap: wrap; /* Allow wrapping to the next line if needed */
 }
 
-ul.member-list li {
-    margin-right: 10px; /* Space between list items */
-}
+
 
 /* Top Banner Image with Slanted Effect */
 .image-container {

@@ -6,7 +6,7 @@ import axiosInstance from '../utils/axiosConfig';
 import { Dropdown } from 'react-bootstrap';
 import CustomToggle from '../utils/customToggle';
 import { deleteTeam, editTeam } from '../actions/team'; // Import the editTeam action
-
+import { toTitleCase } from '../utils/utils';
 
 const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam }) => {
     const [teams, setTeams] = useState([]);
@@ -103,8 +103,9 @@ const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam }) => {
                                                 {team.members.map((member) => (
                                                     <li key={member.id}>
                                                         <span
-                                                            className="member-initial"
-                                                            data-fullname={member.user_name}
+                                                            className={`member-initial ${member.role === 'owner' ? 'owner-initial' : ''}`}
+                                                            data-fullname={`${member.user_name} (${toTitleCase(member.role)})`}
+                                                            title={`${member.user_name} (${toTitleCase(member.role)})`}
                                                         >
                                                             {member.user_name.charAt(0).toUpperCase()}
                                                         </span>
