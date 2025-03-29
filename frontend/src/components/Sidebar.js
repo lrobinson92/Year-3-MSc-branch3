@@ -1,6 +1,7 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
+import { FaQuestion } from 'react-icons/fa';
 
 const Sidebar = ( { user } ) => {
     const getUserInitial = (name) => {
@@ -61,6 +62,14 @@ const Sidebar = ( { user } ) => {
                         >
                             Teams
                         </NavLink>
+                    </li>
+                    <li className="nav-item">
+                        <Link to="/help" className="nav-link">
+                            <div className="d-flex align-items-center">
+                                <FaQuestion className="me-2" />
+                                <span>Help</span>
+                            </div>
+                        </Link>
                     </li>
                 </ul>
             </div>

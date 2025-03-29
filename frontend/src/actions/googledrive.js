@@ -2,12 +2,49 @@ import axiosInstance from '../utils/axiosConfig';
 import { marked } from 'marked';
 import mammoth from 'mammoth';
 import { combineShortParagraphs, formatMarkdownToHTML } from '../utils/utils';
-import { UPLOAD_DOCUMENT_SUCCESS, UPLOAD_DOCUMENT_FAIL, SET_DOCUMENTS, SET_DRIVE_LOGGED_IN, GENERATE_SOP_SUCCESS, GENERATE_SOP_FAIL } from './types';
+import { 
+  UPLOAD_DOCUMENT_SUCCESS, 
+  UPLOAD_DOCUMENT_FAIL, 
+  SET_DOCUMENTS, 
+  SET_DRIVE_LOGGED_IN, 
+  GENERATE_SOP_SUCCESS, 
+  GENERATE_SOP_FAIL,
+  CHECK_DRIVE_AUTH_SUCCESS,
+  CHECK_DRIVE_AUTH_FAIL
+} from './types';
+
+// New action to check Google Drive authentication status
+export const checkDriveAuthStatus = () => async dispatch => {
+  try {
+    await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/google-drive/files/`, {
+      withCredentials: true
+    });
+    
+    dispatch({
+      type: CHECK_DRIVE_AUTH_SUCCESS
+    });
+    
+    return true;
+  } catch (err) {
+    dispatch({
+      type: CHECK_DRIVE_AUTH_FAIL
+    });
+    
+    return false;
+  }
+};
 
 // Action to initiate Google Drive login
-export const googleDriveLogin = () => dispatch => {
-    // Directly redirect the browser to the login endpoint.
-    window.location.href = `${process.env.REACT_APP_API_URL}/api/google-drive/login/`;
+export const googleDriveLogin = (redirectPath = null) => dispatch => {
+  // Store the current URL to redirect back to after login
+  if (redirectPath) {
+    sessionStorage.setItem('driveAuthRedirect', redirectPath);
+  } else {
+    sessionStorage.setItem('driveAuthRedirect', window.location.pathname);
+  }
+  
+  // Directly redirect the browser to the login endpoint.
+  window.location.href = `${process.env.REACT_APP_API_URL}/api/google-drive/login/`;
 };
 
 // Action to upload a document to Google Drive

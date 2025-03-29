@@ -240,19 +240,28 @@ class GoogleDriveCallbackView(View):
         and stores the credentials in the session.
         """
         code = request.GET.get('code')
+        redirect_url = request.GET.get('state', '') or 'http://localhost:3000/view/documents'
+        
         if not code:
             return HttpResponse("Error: No authorization code provided", status=400)
         
         gauth = GoogleAuth()
         gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        
         # Exchange the code for credentials
         gauth.Auth(code=code)
         
-        # Save the credentials (as JSON) in the session; in production, store them securely!
+        # Save the credentials (as JSON) in the session
         request.session['google_drive_credentials'] = gauth.credentials.to_json()
         
-        # Redirect the user to the Documents page (or wherever you need)
-        return redirect("http://localhost:3000/view/documents")
+        # Try to parse the state parameter if it exists (for redirect)
+        try:
+            # Redirect to the frontend callback page with a success indicator
+            return redirect(f"{redirect_url}?drive_auth=success")
+        except Exception as e:
+            logger.error("Error parsing redirect URL: %s", str(e))
+            # Default redirect
+            return redirect("http://localhost:3000/view/documents?drive_auth=success")
 
 class ListDriveFilesView(View):
     def get(self, request, *args, **kwargs):

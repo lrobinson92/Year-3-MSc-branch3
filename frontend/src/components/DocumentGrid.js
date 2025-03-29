@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { formatDate } from '../utils/utils';
+import { connect } from 'react-redux';
+import GoogleDriveAuthCheck from './GoogleDriveAuthCheck';
 
 const DocumentGrid = ({ 
     documents, 
@@ -10,7 +12,8 @@ const DocumentGrid = ({
     teamId = null,
     showTeamName = true,
     cardClass = "document-card",
-    onDocumentClick = null // Add this prop to allow custom click handling
+    onDocumentClick = null,
+    driveLoggedIn // Add this prop
 }) => {
     const navigate = useNavigate();
     
@@ -21,6 +24,14 @@ const DocumentGrid = ({
     const handleDocumentClick = (doc) => {
         if (!doc || !doc.id) {
             console.error('Cannot navigate: Document ID is missing', doc);
+            return;
+        }
+
+        // Check if user is logged into Google Drive before navigating
+        if (!driveLoggedIn) {
+            // Store the document ID to return to after authentication
+            sessionStorage.setItem('pendingDocumentView', doc.id);
+            alert("Please connect to Google Drive first to view this document.");
             return;
         }
         
@@ -36,14 +47,16 @@ const DocumentGrid = ({
         return (
             <div>
                 {showCreateButton && (
-                    <div className="d-flex justify-content-end mb-3">
-                        <Link 
-                            to={teamId ? `/create-document?teamId=${teamId}` : "/create-document"} 
-                            className="btn btn-primary"
-                        >
-                            + Add Document
-                        </Link>
-                    </div>
+                    <GoogleDriveAuthCheck>
+                        <div className="d-flex justify-content-end mb-3">
+                            <Link 
+                                to={teamId ? `/create-document?teamId=${teamId}` : "/create-document"} 
+                                className="btn btn-primary"
+                            >
+                                + Add Document
+                            </Link>
+                        </div>
+                    </GoogleDriveAuthCheck>
                 )}
                 <p>{emptyMessage}</p>
             </div>
@@ -53,14 +66,16 @@ const DocumentGrid = ({
     return (
         <div>
             {showCreateButton && (
-                <div className="d-flex justify-content-end mb-3">
-                    <Link 
-                        to={teamId ? `/create-document?teamId=${teamId}` : "/create-document"} 
-                        className="btn btn-primary"
-                    >
-                        + Add Document
-                    </Link>
-                </div>
+                <GoogleDriveAuthCheck>
+                    <div className="d-flex justify-content-end mb-3">
+                        <Link 
+                            to={teamId ? `/create-document?teamId=${teamId}` : "/create-document"} 
+                            className="btn btn-primary"
+                        >
+                            + Add Document
+                        </Link>
+                    </div>
+                </GoogleDriveAuthCheck>
             )}
             <div className="row">
                 {displayDocs.map(doc => (
@@ -97,4 +112,8 @@ const DocumentGrid = ({
     );
 };
 
-export default DocumentGrid;
+const mapStateToProps = (state) => ({
+    driveLoggedIn: state.googledrive.driveLoggedIn
+});
+
+export default connect(mapStateToProps)(DocumentGrid);
