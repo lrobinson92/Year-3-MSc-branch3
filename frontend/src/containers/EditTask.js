@@ -123,13 +123,22 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
         }
     };
 
+    const handleGoBack = () => {
+        navigate(-1); // This navigates back one step in history
+    };
+
     if (!isAuthenticated) {
         return <Navigate to="/login" />;
     }
 
     return (
         <div className="container mt-5 entry-container">
-            <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/tasks')} />
+            <FaArrowLeft 
+                className="back-arrow" 
+                onClick={handleGoBack} 
+                style={{ cursor: 'pointer' }}
+                title="Go back to previous page" 
+            />
             <div className="card p-4 mx-auto" style={{ maxWidth: '400px' }}>
                 <div className="d-flex align-items-center mb-4">
                     <h1 className="text-center flex-grow-1 mb-0">Edit Task</h1>

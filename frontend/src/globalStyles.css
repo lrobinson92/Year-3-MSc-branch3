@@ -599,4 +599,52 @@ ul.member-list {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     overflow: visible;
   }
-  
+
+/* Add these styles to your CSS file */
+
+.team-detail-container {
+    padding: 20px;
+}
+
+.team-description {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+}
+
+.members-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.member-badge {
+    display: flex;
+    align-items: center;
+    background-color: #f8f9fa;
+    border-radius: 20px;
+    padding: 5px 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+
+.member-name {
+    font-weight: 500;
+}
+
+.disabled-icon {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.document-card {
+    cursor: pointer;
+    transition: transform 0.2s;
+    height: 100%;
+}
+
+.document-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+

@@ -1,11 +1,11 @@
 // ViewDocuments.js
 import React, { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
+import DocumentGrid from '../components/DocumentGrid'; // Import the new component
 import axiosInstance from '../utils/axiosConfig';
-import { googleDriveLogin, uploadDocument, setDocuments, setDriveLoggedIn } from '../actions/googledrive'; 
-import { formatDate } from '../utils/utils';
+import { googleDriveLogin, uploadDocument, setDocuments, setDriveLoggedIn } from '../actions/googledrive';
 
 const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn, documents, setDocuments, setDriveLoggedIn }) => {
   
@@ -31,6 +31,9 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     fetchDocuments();
   }, [setDocuments]);
 
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
 
   if (loading) {
     return <div>Loading...</div>;
@@ -48,9 +51,6 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
           <div className="recent-items-card">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h2>All Documents</h2>
-              <Link to="/create-document" className="btn btn-primary create-new-link">
-                + Create New Document
-              </Link>
             </div>
 
             {!driveLoggedIn && (
@@ -61,30 +61,16 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
               </div>
             )}
 
-
             {error && <div className="alert alert-danger">{error}</div>}
-            <div className="row">
-              {documents.length > 0 ? (
-                documents.map((doc) => (
-                  <div className="col-md-4 mb-3" key={doc.id}>
-                    <Link to={`/view/sop/${doc.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                      <div className="card p-3 view">
-                        <h4>{doc.title}</h4>
-                        <p>Last Updated: {formatDate(doc.updated_at)}</p>
-                        <p>Team: {doc.team_name || 'Personal'}</p>
-                        {/*{doc.file_url && (
-                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                            Download Document
-                          </a>
-                        )}*/}
-                      </div>
-                    </Link>
-                  </div>
-                ))
-              ) : (
-                <p>No documents available.</p>
-              )}
-            </div>
+            
+            {/* Use the new DocumentGrid component */}
+            <DocumentGrid 
+              documents={documents}
+              emptyMessage="No documents available"
+              showCreateButton={true}
+              showTeamName={true}
+              cardClass="view"
+            />
           </div>
         </div>
       </div>

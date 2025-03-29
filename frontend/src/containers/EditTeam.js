@@ -84,13 +84,22 @@ const EditTeam = ({ editTeam, updateMemberRole, removeMember, user, teams }) => 
         }
     };
 
+    const handleGoBack = () => {
+        navigate(-1); // This navigates back one step in history
+    };
+
     if (loading) {
         return <div>Loading...</div>;
     }
 
     return (
         <div className='container mt-5 entry-container'>
-            <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/teams')} />
+            <FaArrowLeft 
+                            className="back-arrow" 
+                            onClick={handleGoBack} 
+                            style={{ cursor: 'pointer' }}
+                            title="Go back to previous page" 
+                        />
             <div className="card p-4 mx-auto" style={{ maxWidth: '500px' }}>
                 <h1 className="text-center mb-4">Edit Team</h1>
                 

@@ -53,6 +53,21 @@ class TeamViewSet(viewsets.ModelViewSet):
             role='owner'
         )
 
+    def perform_destroy(self, instance):
+        """Only allow team owners to delete teams"""
+        # Check if the requesting user is the owner
+        is_owner = TeamMembership.objects.filter(
+            user=self.request.user, 
+            team=instance, 
+            role='owner'
+        ).exists()
+        
+        if is_owner:
+            instance.delete()
+        else:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only team owners can delete a team.")
+
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def invite_member(self, request, pk=None):
         team = self.get_object()
@@ -468,6 +483,14 @@ class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
             Q(team__in=user.teams.all()) | 
             Q(owner=user, team__isnull=True))
     
+    @action(detail=False, methods=['get'], url_path='team/(?P<team_id>\d+)')
+    def team_documents(self, request, team_id=None):
+        """Get all documents for a specific team"""
+        team = get_object_or_404(Team, id=team_id)
+        documents = Document.objects.filter(team=team)
+        serializer = DocumentSerializer(documents, many=True)
+        return Response(serializer.data)
+    
 class GoogleDriveFileContentView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -531,4 +554,3 @@ class GoogleDriveFileContentView(APIView):
             return Response({"error": "Failed to retrieve document content."}, status=500)
 
         return Response({"title":document.title, "content": content, "file_url": document.file_url}, status=200)
-    

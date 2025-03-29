@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import TaskTable from '../components/TaskTable';
+import DocumentGrid from '../components/DocumentGrid';
+import TeamGrid from '../components/TeamGrid'; // Import the new component
 import { resetFirstLogin } from '../actions/auth';
 import { connect } from 'react-redux';
 import axiosInstance from '../utils/axiosConfig';
@@ -8,9 +11,9 @@ import axiosInstance from '../utils/axiosConfig';
 const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
     const [tasks, setTasks] = useState([]);
     const [teams, setTeams] = useState([]);
+    const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
-
 
     useEffect(() => {
         if (firstLogin) {
@@ -19,33 +22,40 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
     }, [firstLogin, resetFirstLogin]);
 
     useEffect(() => {
-        const fetchTasks = async () => {
+        const fetchData = async () => {
             try {
-                const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/tasks/user-and-team-tasks/`, { withCredentials: true });
-                const userTasks = res.data.user_tasks;
+                // Fetch tasks
+                const tasksRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/tasks/user-and-team-tasks/`, { withCredentials: true });
+                const userTasks = tasksRes.data.user_tasks;
                 const filteredTasks = userTasks.filter(task => task.status !== 'complete');
                 const sortedTasks = filteredTasks.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
-                setTasks(sortedTasks.slice(0, 3)); // Get the three tasks due the soonest
-            } catch (err) {
-                console.error('Failed to fetch tasks:', err);
-            }
-        };
-
-        const fetchTeams = async () => {
-            try {
-                const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, { withCredentials: true });
-                const userTeams = res.data;
+                setTasks(sortedTasks.slice(0, 5)); // Show top 5 upcoming tasks
+                
+                // Fetch teams
+                const teamsRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, { withCredentials: true });
+                const userTeams = teamsRes.data;
                 const sortedTeams = userTeams.sort((a, b) => {
                     const roleOrder = { owner: 1, admin: 2, member: 3 };
                     return roleOrder[a.role] - roleOrder[b.role];
                 });
-                setTeams(sortedTeams.slice(0, 3));
+                setTeams(sortedTeams.slice(0, 3)); // Show top 3 teams
+                
+                // Fetch documents
+                const docsRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/documents/`, { withCredentials: true });
+                const sortedDocs = docsRes.data.sort((a, b) => {
+                    const dateA = new Date(a.updated_at || a.created_at);
+                    const dateB = new Date(b.updated_at || b.created_at);
+                    return dateB - dateA;
+                });
+                setDocuments(sortedDocs.slice(0, 3)); // Show 3 most recent documents
             } catch (err) {
-                console.error('Failed to fetch teams:', err);
+                console.error('Failed to fetch data:', err);
+            } finally {
+                setLoading(false);
             }
         };
 
-        Promise.all([fetchTasks(), fetchTeams()]).then(() => setLoading(false));
+        fetchData();
     }, [user]);
 
     if (!isAuthenticated) {
@@ -56,91 +66,55 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
         return <div>Loading...</div>;
     }
 
-    const getStatusText = (status) => {
-        switch (status) {
-            case 'in_progress':
-                return 'In progress';
-            case 'not_started':
-                return 'Not started';
-            default:
-                return status;
-        }
-    };
-
-    const handleTaskClick = (taskId) => {
-        navigate(`/view/tasks`);
-    };
-
     const handleTeamClick = (teamId) => {
-        navigate(`/view/teams`);
+        navigate(`/team/${teamId}`);
     };
 
     return (
         <div>
-            {/* Sidebar and Main Content */}
             <div className="d-flex">
                 <Sidebar />
                 <div className="main-content">
-                <div className="recent-items-card">
-                        {/* Recent Items */}
+                    <div className="recent-items-card">
+                        {/* Recent Documents */}
                         <div className="row mb-4">
-                            <h3>Recent Items</h3>
-                            <div className="col-md-4 mb-3">
-                                <div className="card p-3">
-                                    <h5>Item 1</h5>
-                                    <p>Details about recent item 1.</p>
-                                </div>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h3>Recent Documents</h3>
                             </div>
-                            <div className="col-md-4 mb-3">
-                                <div className="card p-3">
-                                    <h5>Item 2</h5>
-                                    <p>Details about recent item 2.</p>
-                                </div>
-                            </div>
-                            <div className="col-md-4 mb-3">
-                                <div className="card p-3">
-                                    <h5>Item 3</h5>
-                                    <p>Details about recent item 3.</p>
-                                </div>
-                            </div>
+                            <DocumentGrid 
+                                documents={documents}
+                                emptyMessage="No documents available"
+                                limit={6}
+                                showTeamName={true}
+                            />
                         </div>
     
                         {/* Tasks */}
                         <div className="row mb-4">
-                            <h3>Tasks</h3>
-                            {tasks.map((task, index) => (
-                                <div key={index} className="col-md-4 mb-3">
-                                    <div className="card p-3" onClick={() => handleTaskClick(task.id)} style={{ cursor: 'pointer' }}>
-                                        <h5>{task.description}</h5>
-                                        <p>Status: {getStatusText(task.status)}</p>
-                                        <p>Due Date: {new Date(task.due_date).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                            ))}
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h3>Upcoming Tasks</h3>
+                            </div>
+                            <TaskTable 
+                                tasks={tasks} 
+                                emptyMessage="No upcoming tasks" 
+                                limit={6}
+                                showColumns={{ status: true, description: true, assignedTo: true, team: true, dueDate: true, actions: false }}
+                            />
                         </div>
 
                         {/* Teams */}
-                        <div className="row">
-                            <h3>Teams</h3>
-                            {teams.map((team) => (
-                                <div className="col-md-4 mb-3" key={team.id}>
-                                    <div className="card p-3" onClick={() => handleTeamClick(team.id)} style={{ cursor: 'pointer' }}>
-                                        <h5>{team.name}</h5>
-                                        <ul className="member-list">
-                                            {team.members.map((member) => (
-                                                <li key={member.id}>
-                                                    <span
-                                                        className="member-initial"
-                                                        data-fullname={member.user_name}
-                                                    >
-                                                        {member.user_name.charAt(0).toUpperCase()}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="row mb-4">
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h3>Your Teams</h3>
+                            </div>
+                            <TeamGrid 
+                                teams={teams} 
+                                emptyMessage="No teams available"
+                                limit={3}
+                                showActions={false}
+                                currentUser={user}
+                                onTeamClick={handleTeamClick}
+                            />
                         </div>
                     </div>
                 </div>

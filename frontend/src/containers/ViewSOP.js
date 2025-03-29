@@ -41,9 +41,18 @@ const ViewSOP = ({ isAuthenticated }) => {
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="alert alert-danger">{error}</div>;
 
+  const handleGoBack = () => {
+    navigate(-1); // This navigates back one step in history
+  };
+
   return (
     <div className="d-flex">
-      <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/documents')} />
+      <FaArrowLeft 
+                                                          className="back-arrow" 
+                                                          onClick={handleGoBack} 
+                                                          style={{ cursor: 'pointer' }}
+                                                          title="Go back to previous page" 
+                                                      />
       <div className="container mt-5 entry-container">
         <div className="recent-items-card">
           <div className="d-flex justify-content-between align-items-center mb-3">

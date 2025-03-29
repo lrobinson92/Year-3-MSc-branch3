@@ -18,3 +18,19 @@ class IsOwnerOrAssignedUser(BasePermission):
                 return True
         
         return False
+
+class IsTeamOwner(BasePermission):
+    """
+    Custom permission to only allow team owners to perform certain actions.
+    """
+    def has_object_permission(self, request, view, obj):
+        # Read permissions are allowed for any team member
+        if request.method in SAFE_METHODS:
+            return TeamMembership.objects.filter(user=request.user, team=obj).exists()
+        
+        # Write permissions are only allowed to the team owner
+        return TeamMembership.objects.filter(
+            user=request.user, 
+            team=obj, 
+            role='owner'
+        ).exists()

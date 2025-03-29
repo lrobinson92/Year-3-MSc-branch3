@@ -28,9 +28,18 @@ const InviteMember = () => {
         }
     };
 
+    const handleGoBack = () => {
+        navigate(-1); // This navigates back one step in history
+    };
+
     return (
         <div className='container mt-5 entry-container'>
-            <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/teams')} />
+            <FaArrowLeft 
+                            className="back-arrow" 
+                            onClick={handleGoBack} 
+                            style={{ cursor: 'pointer' }}
+                            title="Go back to previous page" 
+                        />
             <div className="card p-4 mx-auto" style={{ maxWidth: '400px' }}>
                 <h1 className="text-center mb-4">Invite Member</h1>
                 <form onSubmit={onSubmit}>

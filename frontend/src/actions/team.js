@@ -55,9 +55,13 @@ export const deleteTeam = (teamId) => async dispatch => {
             payload: teamId
         });
     } catch (err) {
+        const errorMessage = err.response?.data?.error || 'Failed to delete team';
+        
         dispatch({
-            type: DELETE_TEAM_FAIL
+            type: DELETE_TEAM_FAIL,
+            payload: errorMessage
         });
+        
         throw err;
     }
 };

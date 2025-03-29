@@ -2,24 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
+import TeamGrid from '../components/TeamGrid'; // Import the TeamGrid component
 import axiosInstance from '../utils/axiosConfig';
-import { Dropdown } from 'react-bootstrap';
-import CustomToggle from '../utils/customToggle';
-import { deleteTeam, editTeam } from '../actions/team'; // Import the editTeam action
-import { toTitleCase } from '../utils/utils';
+import { deleteTeam, editTeam } from '../actions/team';
 
-const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam }) => {
+const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam, user }) => {
     const [teams, setTeams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchTeams = async () => {
             try {
                 const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, {
-                    withCredentials: true,  // Include credentials in the request
+                    withCredentials: true,
                 });
                 setTeams(res.data);
             } catch (err) {
@@ -51,10 +48,15 @@ const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam }) => {
 
     const handleDelete = async (teamId) => {
         try {
+            // Add confirmation before deleting
+            const confirmDelete = window.confirm("Are you sure you want to delete this team? This action cannot be undone.");
+            if (!confirmDelete) return;
+            
             await deleteTeam(teamId);
             setTeams(teams.filter(team => team.id !== teamId));
         } catch (err) {
-            console.error('Failed to delete team');
+            console.error('Failed to delete team:', err);
+            alert('Failed to delete team. Please try again.');
         }
     };
 
@@ -66,9 +68,12 @@ const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam }) => {
         navigate(`/invite-member/${teamId}`);
     };
 
+    const handleViewTeam = (teamId) => {
+        navigate(`/team/${teamId}`);
+    };
+
     return (
         <div>
-            {/* Sidebar and Main Content */}
             <div className="d-flex">
                 <Sidebar />
                 <div className="main-content">
@@ -79,47 +84,17 @@ const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam }) => {
                                 + Create New Team
                             </Link>
                         </div>  
-                        {/* Recent Items */}
-                        <div className="row">
-                            {Array.isArray(teams) && teams.length > 0 ? (
-                                teams.map((team) => (
-                                    <div className="col-md-4 mb-3" key={team.id}>
-                                        <div className="card p-3 view">
-                                            <div className="d-flex justify-content-between align-items-center">
-                                                <h4>{team.name}</h4>
-                                                <Dropdown>
-                                                    <Dropdown.Toggle as={CustomToggle} id="dropdown-custom-components">
-                                                        ...
-                                                    </Dropdown.Toggle>
-
-                                                    <Dropdown.Menu className="custom-dropdown-menu">
-                                                        <Dropdown.Item onClick={() => handleEdit(team.id)}>Edit</Dropdown.Item>
-                                                        <Dropdown.Item onClick={() => handleAddMembers(team.id)}>Add Members</Dropdown.Item>
-                                                        <Dropdown.Item onClick={() => handleDelete(team.id)}>Delete</Dropdown.Item>
-                                                    </Dropdown.Menu>
-                                                </Dropdown>
-                                            </div>
-                                            <ul className="member-list">
-                                                {team.members.map((member) => (
-                                                    <li key={member.id}>
-                                                        <span
-                                                            className={`member-initial ${member.role === 'owner' ? 'owner-initial' : ''}`}
-                                                            data-fullname={`${member.user_name} (${toTitleCase(member.role)})`}
-                                                            title={`${member.user_name} (${toTitleCase(member.role)})`}
-                                                        >
-                                                            {member.user_name.charAt(0).toUpperCase()}
-                                                        </span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                            <p>{team.description}</p>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p>No teams available</p>
-                            )}
-                        </div>
+                        <TeamGrid 
+                            teams={teams}
+                            emptyMessage="No teams available"
+                            showCreateButton={false} // Already showing the button in the header
+                            showActions={true}
+                            currentUser={user}
+                            onTeamClick={handleViewTeam}
+                            onEditClick={handleEdit}
+                            onAddMembersClick={handleAddMembers}
+                            onDeleteClick={handleDelete}
+                        />
                     </div>
                 </div>
             </div>
@@ -130,6 +105,7 @@ const ViewTeams = ({ isAuthenticated, firstLogin, deleteTeam }) => {
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
     firstLogin: state.auth.firstLogin,
+    user: state.auth.user
 });
 
 export default connect(mapStateToProps, { deleteTeam, editTeam })(ViewTeams);

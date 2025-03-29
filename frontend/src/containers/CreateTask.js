@@ -92,9 +92,18 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
         return <Navigate to="/login" />;
     }
 
+    const handleGoBack = () => {
+        navigate(-1); // This navigates back one step in history
+    };
+
     return (
         <div className="container mt-5 entry-container">
-            <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/tasks')} />
+            <FaArrowLeft 
+                                        className="back-arrow" 
+                                        onClick={handleGoBack} 
+                                        style={{ cursor: 'pointer' }}
+                                        title="Go back to previous page" 
+                                    />
             <div className="card p-4 mx-auto" style={{ maxWidth: '400px' }}>
                 <h1 className="text-center mb-4">Create Task</h1>
                 <form onSubmit={onSubmit}>

@@ -210,11 +210,19 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
     }
   };
   
+  const handleGoBack = () => {
+    navigate(-1); // This navigates back one step in history
+  };
   
 
   return (
     <div className="container mt-5 entry-container">
-      <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/documents')} />
+      <FaArrowLeft 
+                                  className="back-arrow" 
+                                  onClick={handleGoBack} 
+                                  style={{ cursor: 'pointer' }}
+                                  title="Go back to previous page" 
+                              />
       <div className="card create-document-card p-4 w-100" style={{ maxWidth: '1200px' }}>
         <h4 className="mb-4">Create Document</h4>
 
