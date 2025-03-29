@@ -9,7 +9,9 @@ import {
     UPDATE_MEMBER_ROLE_SUCCESS,
     UPDATE_MEMBER_ROLE_FAIL,
     REMOVE_MEMBER_SUCCESS,
-    REMOVE_MEMBER_FAIL
+    REMOVE_MEMBER_FAIL,
+    FETCH_TEAMS_SUCCESS,
+    FETCH_TEAMS_FAIL
 } from './types';
 
 export const createTeam = (name, description) => async dispatch => {
@@ -131,5 +133,28 @@ export const removeMember = (teamId, userId) => async dispatch => {
             type: REMOVE_MEMBER_FAIL
         });
         throw err;
+    }
+};
+
+// Fetch all teams for the current user
+export const fetchTeams = () => async dispatch => {
+    const config = {
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        withCredentials: true
+    };
+
+    try {
+        const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, config);
+        
+        dispatch({
+            type: FETCH_TEAMS_SUCCESS,
+            payload: res.data
+        });
+    } catch (err) {
+        dispatch({
+            type: FETCH_TEAMS_FAIL
+        });
     }
 };

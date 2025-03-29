@@ -1,4 +1,6 @@
 import { 
+    FETCH_TEAMS_SUCCESS,
+    FETCH_TEAMS_FAIL,
     CREATE_TEAM_SUCCESS, 
     CREATE_TEAM_FAIL, 
     DELETE_TEAM_SUCCESS, 
@@ -13,13 +15,26 @@ import {
 
 const initialState = {
     teams: [],
+    loading: true,
     error: null
 };
 
-function teamReducer(state = initialState, action) {
+export default function teamReducer(state = initialState, action) {
     const { type, payload } = action;
 
     switch (type) {
+        case FETCH_TEAMS_SUCCESS:
+            return {
+                ...state,
+                teams: payload,
+                loading: false
+            };
+        case FETCH_TEAMS_FAIL:
+            return {
+                ...state,
+                error: 'Failed to fetch teams',
+                loading: false
+            };
         case CREATE_TEAM_SUCCESS:
             return {
                 ...state,
@@ -94,6 +109,4 @@ function teamReducer(state = initialState, action) {
         default:
             return state;
     }
-};
-
-export default teamReducer;
+}

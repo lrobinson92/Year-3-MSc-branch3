@@ -11,10 +11,6 @@ class IsOwnerOrAssignedUser(BasePermission):
         if obj.assigned_to == request.user:
             return True
         
-        # Check if the user is the owner of the document
-        if obj.owner == request.user:
-            return True
-        
         # Check if the user is an owner of the team
         if obj.team:
             membership = TeamMembership.objects.filter(user=request.user, team=obj.team, role='owner').exists()
