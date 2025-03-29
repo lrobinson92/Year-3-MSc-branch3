@@ -9,12 +9,28 @@ const DocumentGrid = ({
     showCreateButton = false,
     teamId = null,
     showTeamName = true,
-    cardClass = "document-card"
+    cardClass = "document-card",
+    onDocumentClick = null // Add this prop to allow custom click handling
 }) => {
     const navigate = useNavigate();
     
     // If limit is set, only show that many documents
     const displayDocs = limit ? documents.slice(0, limit) : documents;
+    
+    // Handle document click with default behavior or custom handler
+    const handleDocumentClick = (doc) => {
+        if (!doc || !doc.id) {
+            console.error('Cannot navigate: Document ID is missing', doc);
+            return;
+        }
+        
+        if (onDocumentClick) {
+            onDocumentClick(doc);
+        } else {
+            // Default behavior - navigate to document view
+            navigate(`/view/sop/${doc.id}`);
+        }
+    };
     
     if (!documents || documents.length === 0) {
         return (
@@ -51,7 +67,19 @@ const DocumentGrid = ({
                     <div className="col-md-4 mb-3" key={doc.id}>
                         <div 
                             className={`card p-3 ${cardClass}`} 
-                            onClick={() => navigate(`/document/${doc.id}`)}
+                            onClick={() => handleDocumentClick(doc)}
+                            style={{ 
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s, box-shadow 0.2s'
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-3px)';
+                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
                         >
                             <h4>{doc.title || doc.name}</h4>
                             {doc.description && <p className="doc-description">{doc.description}</p>}

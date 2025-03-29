@@ -70,6 +70,8 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
               showCreateButton={true}
               showTeamName={true}
               cardClass="view"
+              // You can add a custom handler if needed, but the default should work
+              // onDocumentClick={(doc) => navigate(`/document/${doc.id}`)}
             />
           </div>
         </div>
