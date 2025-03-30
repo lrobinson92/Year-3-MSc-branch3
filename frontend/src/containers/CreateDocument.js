@@ -7,6 +7,7 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { uploadDocument, generateSOP } from '../actions/googledrive';
 import { FaArrowLeft, FaCalendarAlt } from 'react-icons/fa';
+import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
 import '../globalStyles.css'; // Ensure the global styles are imported
 
 const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) => {
@@ -28,11 +29,16 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const [creating, setCreating] = useState(false);
   const [reviewDate, setReviewDate] = useState('');
   const [setReviewReminder, setSetReviewReminder] = useState(false);
+  const [driveLoggedIn, setDriveLoggedIn] = useState(false);
 
   const quillRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const navigate = useNavigate();
+
+  const handleGDriveAuth = () => {
+    redirectToGoogleDriveLogin('/create-document');
+  };
 
   // Optionally fetch teams that the user belongs to so they can choose which team this document is for.
   useEffect(() => {
@@ -52,33 +58,36 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     if (!title) {
       setError('Title is required.');
       return;
     }
+    
     if (!textContent) {
       setError('Please enter or upload some content.');
       return;
     }
 
     setCreating(true);
-
+    
     const formData = new FormData();
     formData.append('title', title);
-
+    
     if (teamId) {
       formData.append('team_id', teamId);
     }
-
+    
+    // Don't manipulate the HTML content from ReactQuill - send it as is
+    // ReactQuill already provides proper HTML format
     formData.append('text_content', textContent);
-
-    // Add review date if enabled
+    
     if (setReviewReminder && reviewDate) {
       formData.append('review_date', reviewDate);
     }
 
     try {
-      const res = await axiosInstance.post(
+      await axiosInstance.post(
         `${process.env.REACT_APP_API_URL}/api/google-drive/upload/`,
         formData,
         {
@@ -86,13 +95,12 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           withCredentials: true,
         }
       );
-      // On success, redirect to view documents
       navigate('/view/documents');
     } catch (err) {
-      console.error(err);
+      console.error('Error creating document:', err);
       setError('Failed to create document.');
     } finally {
-      setCreating(false); // Reset loading state regardless of outcome
+      setCreating(false);
     }
   };
 
@@ -427,6 +435,15 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
               </div>
             </div>
           </div>
+        )}
+
+        {!driveLoggedIn && (
+          <button 
+            className="btn btn-primary" 
+            onClick={handleGDriveAuth}
+          >
+            Connect to Google Drive to Continue
+          </button>
         )}
 
         <div className="mb-4" style={{ marginBottom: '2rem' }}>

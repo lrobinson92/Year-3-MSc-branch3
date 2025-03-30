@@ -226,11 +226,13 @@ class GoogleDriveLoginView(View):
         Initiate OAuth flow with Google Drive.
         """
         gauth = GoogleAuth()
-        # Point to your client_secrets.json file (update the path as needed)
-        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE  # e.g., "client_secrets.json"
-        
-        # Get the authentication URL and redirect the user there
-        auth_url = gauth.GetAuthUrl()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        gauth.LoadClientConfigFile(settings.GOOGLE_CLIENT_SECRETS_FILE)
+
+        # Force the correct web-based flow
+        gauth.GetFlow()
+        gauth.flow.redirect_uri = "http://localhost:8000/api/google-drive/callback/"  # This must match the authorized redirect URI
+        auth_url = gauth.flow.step1_get_authorize_url()
         return redirect(auth_url)
 
 class GoogleDriveCallbackView(View):

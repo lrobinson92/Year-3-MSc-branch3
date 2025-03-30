@@ -1,82 +1,68 @@
 // ViewSOP.js
-import React, { useState, useEffect } from 'react';
-import { useParams, Navigate, useNavigate } from 'react-router-dom';
-import axiosInstance from '../utils/axiosConfig';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
-import GoogleDriveAuthCheck from '../components/GoogleDriveAuthCheck';
-import '../globalStyles.css';
+import axiosInstance from '../utils/axiosConfig';
 import { FaArrowLeft } from 'react-icons/fa';
-import { googleDriveLogin } from '../actions/googledrive';
+import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
 
-const ViewSOP = ({ isAuthenticated, driveLoggedIn, googleDriveLogin }) => {
-  const { id } = useParams(); // Document ID
+const ViewSOP = ({ isAuthenticated, driveLoggedIn }) => {
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const navigate = useNavigate();
+  const [error, setError] = useState('');
+
+  const handleDriveLogin = () => {
+    redirectToGoogleDriveLogin(window.location.pathname);
+  };
 
   useEffect(() => {
-    // Check if we're authenticated with Google Drive before fetching
-    if (!driveLoggedIn) {
-      setLoading(false);
-      return; // Don't try to fetch content if not authenticated
-    }
+    if (!driveLoggedIn) return;
 
-    const fetchDocumentContent = async () => {
+    const fetchDocument = async () => {
       try {
-        const res = await axiosInstance.get(
-          `${process.env.REACT_APP_API_URL}/api/google-drive/file-content/${id}/`, 
-          { withCredentials: true }
-        );
-        setTitle(res.data.title);
+        const res = await axiosInstance.get(`/api/google-drive/file-content/${id}/`);
+        setTitle(res.data.title || 'Untitled');
         setContent(res.data.content);
         setFileUrl(res.data.file_url);
-        setError(null);
       } catch (err) {
         console.error(err);
-        if (err.response && err.response.status === 401) {
-          setError('Google Drive authentication required.');
-        } else {
-          setError('Failed to fetch document content.');
-        }
+        setError('Failed to load file content.');
       } finally {
         setLoading(false);
       }
     };
-    
-    fetchDocumentContent();
-  }, [id, driveLoggedIn]);
 
-  // Store the document ID when the component mounts
-  useEffect(() => {
-    if (!driveLoggedIn) {
-      sessionStorage.setItem('pendingDocumentView', id);
-    }
+    fetchDocument();
   }, [id, driveLoggedIn]);
-
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  
-  const handleGoBack = () => {
-    navigate(-1); // This navigates back one step in history
-  };
 
   return (
     <div className="d-flex">
       <Sidebar />
       <div className="main-content">
-        <FaArrowLeft 
-          className="back-arrow" 
-          onClick={handleGoBack} 
+        <FaArrowLeft
+          className="back-arrow"
+          onClick={() => navigate(-1)}
           style={{ cursor: 'pointer', margin: '20px 0 0 20px' }}
-          title="Go back to previous page" 
+          title="Go back to previous page"
         />
-        
+
         <div className="recent-items-card">
           {!driveLoggedIn ? (
-            <GoogleDriveAuthCheck />
+            <div className="text-center p-5">
+              <h3>Google Drive Authentication Required</h3>
+              <p>You need to authenticate with Google Drive to view this document.</p>
+              <button
+                className="btn btn-primary mt-3"
+                onClick={handleDriveLogin}
+              >
+                Connect to Google Drive
+              </button>
+            </div>
           ) : loading ? (
             <div className="text-center p-5">
               <div className="spinner-border text-primary" role="status">
@@ -90,12 +76,21 @@ const ViewSOP = ({ isAuthenticated, driveLoggedIn, googleDriveLogin }) => {
             <>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h2>{title}</h2>
-                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                >
                   Edit Document
                 </a>
               </div>
               <div className="sop-detail-card">
-                <div className="document-content" dangerouslySetInnerHTML={{ __html: content }}></div>
+                <div
+                  className="document-content"
+                  dangerouslySetInnerHTML={{ __html: content }}
+                  style={{ lineHeight: '1.6', fontSize: '16px' }}
+                ></div>
               </div>
             </>
           )}
@@ -107,7 +102,7 @@ const ViewSOP = ({ isAuthenticated, driveLoggedIn, googleDriveLogin }) => {
 
 const mapStateToProps = (state) => ({
   isAuthenticated: state.auth.isAuthenticated,
-  driveLoggedIn: state.googledrive.driveLoggedIn
+  driveLoggedIn: state.googledrive.driveLoggedIn,
 });
 
-export default connect(mapStateToProps, { googleDriveLogin })(ViewSOP);
+export default connect(mapStateToProps)(ViewSOP);

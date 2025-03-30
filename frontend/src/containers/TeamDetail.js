@@ -8,8 +8,10 @@ import axiosInstance from '../utils/axiosConfig';
 import { formatDate, toTitleCase } from '../utils/utils';
 import { fetchTeams } from '../actions/team';
 import { FaPlus } from 'react-icons/fa';
+import { FcGoogle } from 'react-icons/fc';
+import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils'; // Import the redirect utility
 
-const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
+const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => { // Add driveLoggedIn prop
     const { teamId } = useParams();
     const [team, setTeam] = useState(null);
     const [members, setMembers] = useState([]);
@@ -19,6 +21,17 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+
+    // Add handler function for Google Drive authentication
+    const handleDocumentClick = (doc) => {
+        if (!driveLoggedIn) {
+            // Save the current URL for returning after login
+            redirectToGoogleDriveLogin(window.location.pathname);
+        } else {
+            // Navigate to the document viewer if already logged in
+            navigate(`/view/sop/${doc.id}`);
+        }
+    };
 
     useEffect(() => {
         const fetchTeamData = async () => {
@@ -139,13 +152,24 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
                     <div className="mb-4">
                         <div className="d-flex justify-content-between align-items-center mb-1">
                             <h3>Documents</h3>
-                            <Link 
-                                to={`/create-document?teamId=${teamId}`} 
-                                className="btn btn-sm btn-outline-primary d-flex align-items-center"
-                                title="Add New Document"
-                            >
-                                <FaPlus className="me-1" /> Add Document
-                            </Link>
+                            <div className="d-flex gap-2">
+                                {/* Show Google Drive login button if not logged in */}
+                                {!driveLoggedIn && (
+                                    <button 
+                                        className="btn btn-sm btn-secondary d-flex align-items-center"
+                                        onClick={() => redirectToGoogleDriveLogin(window.location.pathname)}
+                                    >
+                                        <FcGoogle className="me-1" /> Connect Google Drive
+                                    </button>
+                                )}
+                                <Link 
+                                    to={`/create-document?teamId=${teamId}`} 
+                                    className="btn btn-sm btn-outline-primary d-flex align-items-center"
+                                    title="Add New Document"
+                                >
+                                    <FaPlus className="me-1" /> Add Document
+                                </Link>
+                            </div>
                         </div>
                         <DocumentGrid 
                             documents={documents}
@@ -153,6 +177,8 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
                             showCreateButton={false}
                             teamId={teamId}
                             showTeamName={false}
+                            onDocumentClick={handleDocumentClick} // Add custom click handler
+                            driveLoggedIn={driveLoggedIn} // Pass down Google Drive login status
                         />
                     </div>
                 </div>
@@ -163,7 +189,8 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
 
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
-    user: state.auth.user
+    user: state.auth.user,
+    driveLoggedIn: state.googledrive.driveLoggedIn // Add Google Drive authentication status
 });
 
 export default connect(mapStateToProps, { fetchTeams })(TeamDetail);

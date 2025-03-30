@@ -1,8 +1,8 @@
-import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatDate } from '../utils/utils';
-import { connect } from 'react-redux';
 import GoogleDriveAuthCheck from './GoogleDriveAuthCheck';
+import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
 
 const DocumentGrid = ({ 
     documents, 
@@ -13,56 +13,44 @@ const DocumentGrid = ({
     showTeamName = true,
     cardClass = "document-card",
     onDocumentClick = null,
-    driveLoggedIn // Add this prop
+    driveLoggedIn = true 
 }) => {
     const navigate = useNavigate();
+    const displayDocs = limit ? documents?.slice(0, limit) : documents;
     
-    // If limit is set, only show that many documents
-    const displayDocs = limit ? documents.slice(0, limit) : documents;
-    
-    // Handle document click with default behavior or custom handler
+    // Handle document click with Google Drive auth logic
     const handleDocumentClick = (doc) => {
-        if (!doc || !doc.id) {
-            console.error('Cannot navigate: Document ID is missing', doc);
-            return;
-        }
-
-        // Check if user is logged into Google Drive before navigating
-        if (!driveLoggedIn) {
-            // Store the document ID to return to after authentication
-            sessionStorage.setItem('pendingDocumentView', doc.id);
-            alert("Please connect to Google Drive first to view this document.");
-            return;
-        }
-        
         if (onDocumentClick) {
+            // Use the custom handler if provided
             onDocumentClick(doc);
         } else {
-            // Default behavior - navigate to document view
-            navigate(`/view/sop/${doc.id}`);
+            // Default behavior
+            if (!driveLoggedIn) {
+                // Redirect to login
+                redirectToGoogleDriveLogin(`/view/sop/${doc.id}`);
+            } else {
+                // Navigate to document
+                navigate(`/view/sop/${doc.id}`);
+            }
         }
     };
     
     if (!documents || documents.length === 0) {
         return (
-            <div>
+            <div className="text-center py-5">
+                <p className="text-muted">{emptyMessage}</p>
                 {showCreateButton && (
-                    <GoogleDriveAuthCheck>
-                        <div className="d-flex justify-content-end mb-3">
-                            <Link 
-                                to={teamId ? `/create-document?teamId=${teamId}` : "/create-document"} 
-                                className="btn btn-primary"
-                            >
-                                + Add Document
-                            </Link>
-                        </div>
-                    </GoogleDriveAuthCheck>
+                    <Link 
+                        to={teamId ? `/create-document?teamId=${teamId}` : "/create-document"} 
+                        className="btn btn-primary mt-3"
+                    >
+                        + Add Document
+                    </Link>
                 )}
-                <p>{emptyMessage}</p>
             </div>
         );
     }
-    
+
     return (
         <div>
             {showCreateButton && (
@@ -123,8 +111,4 @@ const DocumentGrid = ({
     );
 };
 
-const mapStateToProps = (state) => ({
-    driveLoggedIn: state.googledrive.driveLoggedIn
-});
-
-export default connect(mapStateToProps)(DocumentGrid);
+export default DocumentGrid;

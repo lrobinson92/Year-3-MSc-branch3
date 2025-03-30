@@ -10,7 +10,8 @@ import {
   GENERATE_SOP_SUCCESS, 
   GENERATE_SOP_FAIL,
   CHECK_DRIVE_AUTH_SUCCESS,
-  CHECK_DRIVE_AUTH_FAIL
+  CHECK_DRIVE_AUTH_FAIL,
+  GOOGLE_DRIVE_AUTH_FAIL
 } from './types';
 
 // New action to check Google Drive authentication status
@@ -38,13 +39,32 @@ export const checkDriveAuthStatus = () => async dispatch => {
 export const googleDriveLogin = (redirectPath = null) => dispatch => {
   // Store the current URL to redirect back to after login
   if (redirectPath) {
-    sessionStorage.setItem('driveAuthRedirect', redirectPath);
+    sessionStorage.setItem('googleDriveRedirect', redirectPath);
   } else {
-    sessionStorage.setItem('driveAuthRedirect', window.location.pathname);
+    sessionStorage.setItem('googleDriveRedirect', window.location.pathname);
   }
   
-  // Directly redirect the browser to the login endpoint.
-  window.location.href = `${process.env.REACT_APP_API_URL}/api/google-drive/login/`;
+  try {
+    // Request auth URL from backend with consistent redirect URI
+    const res = axiosInstance.get(
+      `${process.env.REACT_APP_API_URL}/api/google-drive/login/`,
+      { withCredentials: true }
+    );
+    
+    // Store current page URL for redirect back after auth
+    const currentUrl = window.location.href;
+    sessionStorage.setItem('googleDriveRedirectUrl', currentUrl);
+    
+    // Redirect to Google auth
+    window.location.href = res.data.auth_url;
+    
+  } catch (error) {
+    console.error('Error initiating Google Drive login:', error);
+    dispatch({
+      type: GOOGLE_DRIVE_AUTH_FAIL,
+      payload: error.response?.data || 'Failed to authenticate with Google Drive'
+    });
+  }
 };
 
 // Action to upload a document to Google Drive

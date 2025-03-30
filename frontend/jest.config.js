@@ -7,7 +7,7 @@ module.exports = {
   
   // Transform files with babel-jest
   transform: {
-    "^.+\\.(js|jsx|ts|tsx)$": "babel-jest"
+    "^.+\\.(js|jsx)$": "babel-jest"
   },
   
   // Don't transform node_modules, except for specific libraries that use ESM
@@ -17,10 +17,13 @@ module.exports = {
   
   // Mock CSS/SCSS/image files
   moduleNameMapper: {
-    "\\.(css|scss)$": "<rootDir>/src/__mocks__/styleMock.js",
-    "\\.(jpg|jpeg|png|gif|webp|svg)$": "<rootDir>/src/__mocks__/fileMock.js"
+    "\\.(css|less|scss|sass)$": "identity-obj-proxy",
+    "\\.(jpg|jpeg|png|gif|webp|svg)$": "<rootDir>/__mocks__/fileMock.js"
   },
   
   // Test match patterns
-  testMatch: ["**/__tests__/**/*.js?(x)", "**/?(*.)+(spec|test).js?(x)"]
+  testMatch: ["**/__tests__/**/*.js?(x)", "**/?(*.)+(spec|test).js?(x)"],
+  
+  // Ignore test paths
+  testPathIgnorePatterns: ["/node_modules/", "/build/"]
 };

@@ -12,29 +12,21 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Check authentication status when component mounts
+  // Check if we should redirect to view a document after authentication
   useEffect(() => {
-    const checkDriveAuth = async () => {
-      try {
-        // Try to access Google Drive - this will fail if not authenticated
-        await axiosInstance.get(
-          `${process.env.REACT_APP_API_URL}/api/google-drive/files/`,
-          { withCredentials: true }
-        );
-        setDriveLoggedIn(true);
-      } catch (err) {
-        // If we get a 401, we're not authenticated
-        if (err.response && err.response.status === 401) {
-          setDriveLoggedIn(false);
-        }
+    if (driveLoggedIn) {
+      const pendingDocId = sessionStorage.getItem('pendingDocumentView');
+      if (pendingDocId) {
+        sessionStorage.removeItem('pendingDocumentView');
+        window.location.href = `/view/sop/${pendingDocId}`;
       }
-    };
+    }
+  }, [driveLoggedIn]);
 
-    checkDriveAuth();
-  }, [setDriveLoggedIn]);
-
-  // Fetch documents once we know authentication status
+  // Fetch documents once authenticated with Drive
   useEffect(() => {
+    if (!driveLoggedIn) return;
+
     const fetchDocuments = async () => {
       try {
         const res = await axiosInstance.get(
@@ -51,50 +43,39 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     };
 
     fetchDocuments();
-  }, [setDocuments]);
+  }, [driveLoggedIn, setDocuments]);
 
-  // Check if we should redirect to view a document after authentication
-  useEffect(() => {
-    if (driveLoggedIn) {
-      const pendingDocId = sessionStorage.getItem('pendingDocumentView');
-      if (pendingDocId) {
-        sessionStorage.removeItem('pendingDocumentView');
-        window.location.href = `/view/sop/${pendingDocId}`;
-      }
-    }
-  }, [driveLoggedIn]);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-
-  if (loading && !driveLoggedIn) {
-    return <div>Loading...</div>;
-  }
 
   return (
-    <div>
-      <div className="d-flex">
-        <Sidebar />
-        <div className="main-content">
-          <div className="recent-items-card">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2>All Documents</h2>
-            </div>
+    <div className="d-flex">
+      <Sidebar />
+      <div className="main-content">
+        <div className="recent-items-card">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <h2>All Documents</h2>
+          </div>
 
-            <GoogleDriveAuthCheck>
-              {/* This content only shows when user is authenticated with Google Drive */}
-              {error && <div className="alert alert-danger">{error}</div>}
-              
-              <DocumentGrid 
+          <GoogleDriveAuthCheck showPrompt={true}>
+            {loading ? (
+              <div className="text-center p-5">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p className="mt-3">Loading documents...</p>
+              </div>
+            ) : error ? (
+              <div className="alert alert-danger">{error}</div>
+            ) : (
+              <DocumentGrid
                 documents={documents}
                 emptyMessage="No documents available"
                 showCreateButton={true}
                 showTeamName={true}
                 cardClass="view"
               />
-            </GoogleDriveAuthCheck>
-          </div>
+            )}
+          </GoogleDriveAuthCheck>
         </div>
       </div>
     </div>
@@ -108,4 +89,9 @@ const mapStateToProps = (state) => ({
   documents: state.googledrive.documents,
 });
 
-export default connect(mapStateToProps, { googleDriveLogin, uploadDocument, setDocuments, setDriveLoggedIn })(ViewDocuments);
+export default connect(mapStateToProps, {
+  googleDriveLogin,
+  uploadDocument,
+  setDocuments,
+  setDriveLoggedIn,
+})(ViewDocuments);
