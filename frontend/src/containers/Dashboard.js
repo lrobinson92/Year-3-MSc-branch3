@@ -110,7 +110,6 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                             <TeamGrid 
                                 teams={teams} 
                                 emptyMessage="No teams available"
-                                limit={3}
                                 showActions={false}
                                 currentUser={user}
                                 onTeamClick={handleTeamClick}

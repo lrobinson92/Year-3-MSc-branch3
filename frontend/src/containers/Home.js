@@ -1,53 +1,273 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import bannerImage from '../assests/images/home.jpeg';
-import cardPreview from '../assests/images/card-preview.jpg';
 import { Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
+import { FaFileAlt, FaUsers, FaCheckSquare, FaGoogle, FaRocket, FaLightbulb } from 'react-icons/fa';
+import bannerImage from '../assests/images/home.jpeg';
+import cardPreview from '../assests/images/card-preview.jpg';
 
-const Home = ( { isAuthenticated } ) => {
-
+const Home = ({ isAuthenticated }) => {
+    // SOPify brand purple color
+    const brandPurple = '#111049'; // Use your exact purple color code
+    const brandLightPurple = '#615fd8';
 
     if (isAuthenticated) {
         return <Navigate to="view/dashboard/" />;
     }
 
     return (
-        <div className="home-page">     
-            <div className="image-container">
+        <div className="home-page">
+            {/* Hero Section with Purple Gradient Overlay */}
+            <div className="hero-section position-relative">
                 <img
                     src={bannerImage}
-                    alt="Top Banner"
-                    className="slanted-image"
+                    alt="SOPify Banner"
+                    className="w-100"
+                    style={{ height: '60vh', objectFit: 'cover' }}
                 />
-            </div>
-
-            <div className='container'>
-                {/* Card Layout */}
-                <div className="row mt-5 d-flex align-items-stretch">
-                    <div className="col-md-6 d-flex">
-                        <div className="card p-4 shadow-lg flex-fill">
-                            <h1 className="display-4">SOP Generator</h1>
-                            <p className="lead">
-                                Streamline your workflow with our easy-to-use SOP Generator.
-                                Whether you are a small business or a large enterprise, crafting
-                                clear and concise procedures has never been simpler!
-                            </p>
-                            <hr className="my-4" />
-                            <Link to="/login" className="btn btn-primary col-md-3">
-                                Get Started
+                <div className="position-absolute top-0 start-0 w-100 h-100" 
+                    style={{ 
+                        background: `linear-gradient(135deg, rgba(179, 148, 238, 0.85) 0%, rgba(64, 18, 148, 0.9) 100%)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '0 10%'
+                    }}>
+                    <div className="text-white">
+                        <h1 className="display-3 fw-bold mb-3">SOPify</h1>
+                        <p className="lead fs-3 mb-4">
+                            Create, manage, and collaborate on Standard Operating Procedures with ease
+                        </p>
+                        <div className="d-flex gap-3">
+                            <Link to="/signup" className="btn btn-light btn-lg px-4">
+                                Get Started for Free
+                            </Link>
+                            <Link to="/login" className="btn btn-outline-light btn-lg px-4">
+                                Sign In
                             </Link>
                         </div>
                     </div>
-                    <div className="col-md-6 d-flex">
-                        <div className="card p-4 shadow-lg flex-fill">
+                </div>
+            </div>
+
+            <div className='container py-5'>
+                {/* Value Proposition */}
+                <div className="text-center mb-5">
+                    <h2 className="display-5 fw-bold mb-3">Streamline Your Business Procedures</h2>
+                    <p className="lead fs-4 text-muted mx-auto" style={{ maxWidth: '800px' }}>
+                        SOPify helps teams create, organize, and follow standard operating procedures,
+                        reducing errors and increasing productivity.
+                    </p>
+                </div>
+
+                {/* Feature Cards */}
+                <div className="row g-4 mb-5">
+                    <div className="col-md-4">
+                        <div className="card h-100 shadow-sm border-0">
+                            <div className="card-body p-4">
+                                <div className="feature-icon d-flex align-items-center justify-content-center mb-3">
+                                    <FaFileAlt style={{ color: brandPurple }} size={24} />
+                                </div>
+                                <h3 className="card-title h5 fw-bold text-center">Document Management</h3>
+                                <p className="card-text text-center">
+                                    Create, edit and store your SOPs securely in Google Drive with real-time collaboration.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="col-md-4">
+                        <div className="card h-100 shadow-sm border-0">
+                            <div className="card-body p-4">
+                                <div className="feature-icon d-flex align-items-center justify-content-center mb-3">
+                                    <FaUsers style={{ color: brandPurple }} size={24} />
+                                </div>
+                                <h3 className="card-title h5 fw-bold text-center">Team Collaboration</h3>
+                                <p className="card-text text-center">
+                                    Create teams, assign tasks, and manage permissions for seamless workflow.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="col-md-4">
+                        <div className="card h-100 shadow-sm border-0">
+                            <div className="card-body p-4">
+                                <div className="feature-icon d-flex align-items-center justify-content-center mb-3">
+                                    <FaRocket style={{ color: brandPurple }} size={24} />
+                                </div>
+                                <h3 className="card-title h5 fw-bold text-center">AI-Powered Generation</h3>
+                                <p className="card-text text-center">
+                                    Generate professional SOPs instantly with our AI assistant, saving hours of writing time.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* How It Works Section - Changed to Purple */}
+                <div className="py-5">
+                    <h2 className="display-6 fw-bold text-center mb-5">How SOPify Works</h2>
+                    <div className="row g-4">
+                        <div className="col-md-3">
+                            <div className="steps text-center">
+                                <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
+                                    style={{ 
+                                        width: '60px', 
+                                        height: '60px',
+                                        backgroundColor: brandPurple,
+                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                    }}>
+                                    <span className="fw-bold fs-5">1</span>
+                                </div>
+                                <h4 className="h5 fw-bold">Create Team</h4>
+                                <p className="text-muted">Invite members and organize your departments</p>
+                            </div>
+                        </div>
+                        <div className="col-md-3">
+                            <div className="steps text-center">
+                                <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
+                                    style={{ 
+                                        width: '60px', 
+                                        height: '60px',
+                                        backgroundColor: brandPurple,
+                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                    }}>
+                                    <span className="fw-bold fs-5">2</span>
+                                </div>
+                                <h4 className="h5 fw-bold">Connect Drive</h4>
+                                <p className="text-muted">Link your Google Drive for secure document storage</p>
+                            </div>
+                        </div>
+                        <div className="col-md-3">
+                            <div className="steps text-center">
+                                <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
+                                    style={{ 
+                                        width: '60px', 
+                                        height: '60px',
+                                        backgroundColor: brandPurple,
+                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                    }}>
+                                    <span className="fw-bold fs-5">3</span>
+                                </div>
+                                <h4 className="h5 fw-bold">Create SOPs</h4>
+                                <p className="text-muted">Write or generate professional SOPs</p>
+                            </div>
+                        </div>
+                        <div className="col-md-3">
+                            <div className="steps text-center">
+                                <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
+                                    style={{ 
+                                        width: '60px', 
+                                        height: '60px',
+                                        backgroundColor: brandPurple,
+                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                    }}>
+                                    <span className="fw-bold fs-5">4</span>
+                                </div>
+                                <h4 className="h5 fw-bold">Track Tasks</h4>
+                                <p className="text-muted">Manage implementation with task assignments</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Application Preview - Changed Checkboxes to Purple */}
+                <div className="row align-items-center py-5">
+                    <div className="col-lg-5 mb-4 mb-lg-0">
+                        <h2 className="display-6 fw-bold mb-3">Powerful, Yet Simple To Use</h2>
+                        <p className="lead">
+                            SOPify provides an intuitive dashboard where you can:
+                        </p>
+                        <ul className="list-unstyled">
+                            <li className="mb-3 d-flex align-items-center">
+                                <FaCheckSquare style={{ color: brandPurple, fontSize: '22px' }} className="me-2" />
+                                <span className="text-dark fs-5">Access all your documents in one place</span>
+                            </li>
+                            <li className="mb-3 d-flex align-items-center">
+                                <FaCheckSquare style={{ color: brandPurple, fontSize: '22px' }} className="me-2" />
+                                <span className="text-dark fs-5">Track pending tasks and deadlines</span>
+                            </li>
+                            <li className="mb-3 d-flex align-items-center">
+                                <FaCheckSquare style={{ color: brandPurple, fontSize: '22px' }} className="me-2" />
+                                <span className="text-dark fs-5">Collaborate with team members</span>
+                            </li>
+                            <li className="mb-3 d-flex align-items-center">
+                                <FaCheckSquare style={{ color: brandPurple, fontSize: '22px' }} className="me-2" />
+                                <span className="text-dark fs-5">Generate new SOPs with AI assistance</span>
+                            </li>
+                        </ul>
+                        <Link to="/signup" className="btn mt-3 text-white" style={{ backgroundColor: brandPurple, padding: '10px 24px', fontSize: '18px' }}>
+                            Get Started Now
+                        </Link>
+                    </div>
+                    <div className="col-lg-7">
+                        <div className="card shadow border-0">
                             <img
                                 src={cardPreview}
-                                alt="Supporting Visual"
+                                alt="SOPify Dashboard Preview"
                                 className="img-fluid rounded"
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* Testimonials or Benefits */}
+                <div className="py-5">
+                    <h2 className="display-6 fw-bold text-center mb-5">Why Teams Love SOPify</h2>
+                    <div className="row g-4">
+                        <div className="col-md-4">
+                            <div className="card h-100 shadow-sm border-0">
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-center justify-content-center mb-3">
+                                        <FaLightbulb className="text-warning" size={32} />
+                                    </div>
+                                    <h4 className="card-title h5 fw-bold text-center">Improve Consistency</h4>
+                                    <p className="card-text text-center">
+                                        Ensure all team members follow the same procedures, reducing errors and improving quality.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="col-md-4">
+                            <div className="card h-100 shadow-sm border-0">
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-center justify-content-center mb-3">
+                                        <FaRocket className="text-success" size={32} />
+                                    </div>
+                                    <h4 className="card-title h5 fw-bold text-center">Save Time</h4>
+                                    <p className="card-text text-center">
+                                        Generate professional SOPs in minutes with AI assistance, not hours of manual writing.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="col-md-4">
+                            <div className="card h-100 shadow-sm border-0">
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-center justify-content-center mb-3">
+                                        <FaGoogle className="text-danger" size={32} />
+                                    </div>
+                                    <h4 className="card-title h5 fw-bold text-center">Seamless Integration</h4>
+                                    <p className="card-text text-center">
+                                        Works with the tools you already use, like Google Drive for document management.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Call to Action - Changed to Gradient Purple/Dark */}
+                <div className="p-5 text-center rounded-3 mt-5"
+                    style={{
+                        background: `linear-gradient(175deg, ${brandPurple} 0%, ${brandLightPurple} 100%)`,
+                        boxShadow: '0 5px 15px rgba(111, 66, 193, 0.3)'
+                    }}>
+                    <h2 className="display-5 fw-bold mb-3" style={{ color: '#f2f2f2' }}>Ready to Streamline Your Procedures?</h2>
+                    <p className="fs-4 mb-4" style={{ color: '#f2f2f2' }}>
+                        Join thousands of teams using SOPify to create better standard operating procedures.
+                    </p>
+                    <Link to="/signup" className="btn btn-light btn-lg px-5 py-3 fw-bold">
+                        Start Your Free Account
+                    </Link>
                 </div>
             </div>
         </div>
