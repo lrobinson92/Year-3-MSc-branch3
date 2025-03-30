@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { FaFileAlt, FaUsers, FaCheckSquare, FaGoogle, FaRocket, FaLightbulb } from 'react-icons/fa';
-import bannerImage from '../assests/images/home.jpeg';
+import bannerImage from '../assests/images/night-sky.jpg';
 import cardPreview from '../assests/images/card-preview.jpg';
 
 const Home = ({ isAuthenticated }) => {
     // SOPify brand purple color
-    const brandPurple = '#111049'; // Use your exact purple color code
-    const brandLightPurple = '#615fd8';
+    const brandPurple = '#111049'; // Your exact dark purple color
+    const brandLightPurple = '#615fd8'; // Your exact light purple color
 
     if (isAuthenticated) {
         return <Navigate to="view/dashboard/" />;
@@ -17,28 +17,28 @@ const Home = ({ isAuthenticated }) => {
 
     return (
         <div className="home-page">
-            {/* Hero Section with Purple Gradient Overlay */}
+            {/* Hero Section with Brand Purple Gradient Overlay */}
             <div className="hero-section position-relative">
                 <img
                     src={bannerImage}
                     alt="SOPify Banner"
                     className="w-100"
-                    style={{ height: '60vh', objectFit: 'cover' }}
+                    style={{ height: '55vh', objectFit: 'cover' }}
                 />
                 <div className="position-absolute top-0 start-0 w-100 h-100" 
                     style={{ 
-                        background: `linear-gradient(135deg, rgba(179, 148, 238, 0.85) 0%, rgba(64, 18, 148, 0.9) 100%)`,
+                        
                         display: 'flex',
                         alignItems: 'center',
                         padding: '0 10%'
                     }}>
-                    <div className="text-white">
-                        <h1 className="display-3 fw-bold mb-3">SOPify</h1>
-                        <p className="lead fs-3 mb-4">
+                    <div>
+                        <h1 className="display-2 fw-bold mb-4" style={{ color: '#ffffff' }}>SOPify</h1>
+                        <p className="lead fs-3 mb-4" style={{ color: '#ffffff' }}>
                             Create, manage, and collaborate on Standard Operating Procedures with ease
                         </p>
                         <div className="d-flex gap-3">
-                            <Link to="/signup" className="btn btn-light btn-lg px-4">
+                            <Link to="/signup" className="btn btn-outline-light btn-lg px-4 fw-semibold">
                                 Get Started for Free
                             </Link>
                             <Link to="/login" className="btn btn-outline-light btn-lg px-4">
@@ -102,7 +102,7 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* How It Works Section - Changed to Purple */}
+                {/* How It Works Section */}
                 <div className="py-5">
                     <h2 className="display-6 fw-bold text-center mb-5">How SOPify Works</h2>
                     <div className="row g-4">
@@ -113,7 +113,7 @@ const Home = ({ isAuthenticated }) => {
                                         width: '60px', 
                                         height: '60px',
                                         backgroundColor: brandPurple,
-                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                        boxShadow: '0 4px 6px rgba(17, 16, 73, 0.3)'
                                     }}>
                                     <span className="fw-bold fs-5">1</span>
                                 </div>
@@ -128,7 +128,7 @@ const Home = ({ isAuthenticated }) => {
                                         width: '60px', 
                                         height: '60px',
                                         backgroundColor: brandPurple,
-                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                        boxShadow: '0 4px 6px rgba(17, 16, 73, 0.3)'
                                     }}>
                                     <span className="fw-bold fs-5">2</span>
                                 </div>
@@ -143,7 +143,7 @@ const Home = ({ isAuthenticated }) => {
                                         width: '60px', 
                                         height: '60px',
                                         backgroundColor: brandPurple,
-                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                        boxShadow: '0 4px 6px rgba(17, 16, 73, 0.3)'
                                     }}>
                                     <span className="fw-bold fs-5">3</span>
                                 </div>
@@ -158,7 +158,7 @@ const Home = ({ isAuthenticated }) => {
                                         width: '60px', 
                                         height: '60px',
                                         backgroundColor: brandPurple,
-                                        boxShadow: '0 4px 6px rgba(111, 66, 193, 0.2)'
+                                        boxShadow: '0 4px 6px rgba(17, 16, 73, 0.3)'
                                     }}>
                                     <span className="fw-bold fs-5">4</span>
                                 </div>
@@ -169,7 +169,7 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* Application Preview - Changed Checkboxes to Purple */}
+                {/* Application Preview */}
                 <div className="row align-items-center py-5">
                     <div className="col-lg-5 mb-4 mb-lg-0">
                         <h2 className="display-6 fw-bold mb-3">Powerful, Yet Simple To Use</h2>
@@ -209,7 +209,7 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* Testimonials or Benefits */}
+                {/* Benefits */}
                 <div className="py-5">
                     <h2 className="display-6 fw-bold text-center mb-5">Why Teams Love SOPify</h2>
                     <div className="row g-4">
@@ -255,14 +255,14 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* Call to Action - Changed to Gradient Purple/Dark */}
+                {/* Call to Action */}
                 <div className="p-5 text-center rounded-3 mt-5"
                     style={{
                         background: `linear-gradient(175deg, ${brandPurple} 0%, ${brandLightPurple} 100%)`,
-                        boxShadow: '0 5px 15px rgba(111, 66, 193, 0.3)'
+                        boxShadow: '0 5px 15px rgba(17, 16, 73, 0.3)'
                     }}>
-                    <h2 className="display-5 fw-bold mb-3" style={{ color: '#f2f2f2' }}>Ready to Streamline Your Procedures?</h2>
-                    <p className="fs-4 mb-4" style={{ color: '#f2f2f2' }}>
+                    <h2 className="display-5 fw-bold mb-3" style={{ color: '#ffffff' }}>Ready to Streamline Your Procedures?</h2>
+                    <p className="fs-4 mb-4" style={{ color: '#ffffff' }}>
                         Join thousands of teams using SOPify to create better standard operating procedures.
                     </p>
                     <Link to="/signup" className="btn btn-light btn-lg px-5 py-3 fw-bold">

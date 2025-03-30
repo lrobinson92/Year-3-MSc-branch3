@@ -1,6 +1,8 @@
 import logging
+import datetime  # Add this import
 from djoser.serializers import UserCreateSerializer as DjoserUserCreateSerializer
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from sop.models import Team, TeamMembership, Task, Document
@@ -61,6 +63,7 @@ class TaskSerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     team_name = serializers.ReadOnlyField(source='team.name')
     owner_name = serializers.ReadOnlyField(source='owner.name')
+    days_until_review = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
@@ -74,8 +77,28 @@ class DocumentSerializer(serializers.ModelSerializer):
             'team', 
             'team_name', 
             'created_at', 
-            'updated_at'
+            'updated_at',
+            'review_date',  # Add review date
+            'days_until_review',  # Add calculated field
         ]
 
     def get_team_name(self, obj):
         return obj.team.name if obj.team else "Personal"
+    
+    def get_days_until_review(self, obj):
+        if not obj.review_date:
+            return None
+        
+        today = timezone.now().date()
+        
+        # Convert review_date to a date object if it's a string
+        if isinstance(obj.review_date, str):
+            try:
+                review_date = datetime.datetime.strptime(obj.review_date, '%Y-%m-%d').date()
+            except ValueError:
+                return None
+        else:
+            review_date = obj.review_date
+            
+        delta = review_date - today
+        return delta.days

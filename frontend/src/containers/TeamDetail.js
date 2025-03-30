@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
 import TaskTable from '../components/TaskTable';
@@ -7,12 +7,14 @@ import DocumentGrid from '../components/DocumentGrid';
 import axiosInstance from '../utils/axiosConfig';
 import { formatDate, toTitleCase } from '../utils/utils';
 import { fetchTeams } from '../actions/team';
-import { FaPlus } from 'react-icons/fa'; // Import the plus icon
+import { FaPlus } from 'react-icons/fa';
 
 const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
     const { teamId } = useParams();
     const [team, setTeam] = useState(null);
+    const [members, setMembers] = useState([]);
     const [tasks, setTasks] = useState([]);
+    const [filteredTasks, setFilteredTasks] = useState([]);
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -21,15 +23,11 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
     useEffect(() => {
         const fetchTeamData = async () => {
             try {
-                // Fetch teams for permission checks
                 await fetchTeams();
-                
+
                 const teamRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/${teamId}/`, { withCredentials: true });
                 setTeam(teamRes.data);
-
-                // Debug logging
-                console.log("Team data:", teamRes.data);
-                console.log("Team members:", teamRes.data.members);
+                setMembers(teamRes.data.members);
 
                 const tasksRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/tasks/`, { withCredentials: true });
                 const teamTasks = tasksRes.data.filter(task => task.team === parseInt(teamId));
@@ -42,8 +40,8 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
                     setDocuments([]);
                 }
             } catch (err) {
-                console.error(err);
-                setError('Failed to fetch team data');
+                console.error('Error fetching team details:', err);
+                setError('Failed to load team data');
             } finally {
                 setLoading(false);
             }
@@ -52,7 +50,23 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
         fetchTeamData();
     }, [teamId, fetchTeams]);
 
-    // Check if user is team owner
+    useEffect(() => {
+        const today = new Date();
+
+        const filterTasks = () => {
+            if (!tasks) return [];
+
+            return tasks.filter(task => {
+                if (task.status !== 'complete') return true;
+
+                const dueDate = new Date(task.due_date);
+                return dueDate > today;
+            });
+        };
+
+        setFilteredTasks(filterTasks());
+    }, [tasks]);
+
     const isTeamOwner = () => {
         if (!team || !user) return false;
         const userMembership = team.members?.find(member => member.user === user.id);
@@ -73,7 +87,6 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
                     </div>
                     <p className="team-description mb-4">Description: {team.description}</p>
 
-                    {/* Team Members with + button */}
                     <div className="mb-4">
                         <div className="d-flex justify-content-between align-items-center mb-1">
                             <h3>Team Members</h3>
@@ -87,10 +100,8 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
                                 </Link>
                             )}
                         </div>
-                        
-                        {/* Updated member display to use existing CSS classes */}
                         <ul className="member-list">
-                            {team.members && team.members.map((member) => (
+                            {members && members.map((member) => (
                                 <li key={member.id}>
                                     <span
                                         className={`member-initial ${member.role === 'owner' ? 'owner-initial' : ''}`}
@@ -103,25 +114,28 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
                         </ul>
                     </div>
 
-                    {/* Tasks with + button */}
-                    <div className="mb-4">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                            <h3>Tasks</h3>
+                    <div className="my-5">
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h2>Team Tasks</h2>
                             <Link 
                                 to={`/create-task?teamId=${teamId}`} 
-                                className="btn btn-sm btn-outline-primary d-flex align-items-center"
-                                title="Add New Task"
+                                className="btn btn-primary btn-sm"
                             >
-                                <FaPlus className="me-1" /> Add Task
+                                <FaPlus className="me-1" /> Create Task
                             </Link>
                         </div>
                         <TaskTable 
-                            tasks={tasks} 
-                            emptyMessage="No tasks found for this team" 
+                            tasks={filteredTasks} 
+                            emptyMessage="No active tasks for this team" 
+                            showColumns={{ 
+                                status: true, 
+                                assignedTo: true, 
+                                dueDate: true, 
+                                actions: true 
+                            }}
                         />
                     </div>
 
-                    {/* Documents with + button */}
                     <div className="mb-4">
                         <div className="d-flex justify-content-between align-items-center mb-1">
                             <h3>Documents</h3>
@@ -136,9 +150,9 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams }) => {
                         <DocumentGrid 
                             documents={documents}
                             emptyMessage="No documents found for this team"
-                            showCreateButton={false} // We're showing our own button now
+                            showCreateButton={false}
                             teamId={teamId}
-                            showTeamName={false} // No need to show team name in team detail page
+                            showTeamName={false}
                         />
                     </div>
                 </div>

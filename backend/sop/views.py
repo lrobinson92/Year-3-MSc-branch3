@@ -292,6 +292,7 @@ class GoogleDriveUploadView(APIView):
             team_id = request.data.get('team_id', None)
             file_obj = request.FILES.get('file')
             text_content = request.data.get('text_content')
+            review_date = request.data.get('review_date')  # Get review date
             
             if not title:
                 return Response({"error": "Title is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -391,7 +392,8 @@ class GoogleDriveUploadView(APIView):
                 file_url=file_url,
                 google_drive_file_id=drive_file_id,
                 owner=request.user,
-                team=team
+                team=team,
+                review_date=review_date if review_date else None  # Save review date
             )
             
             serializer = DocumentSerializer(document)

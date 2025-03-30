@@ -6,7 +6,7 @@ import { formatMarkdownToHTML } from '../utils/utils';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { uploadDocument, generateSOP } from '../actions/googledrive';
-import { FaArrowLeft } from 'react-icons/fa';
+import { FaArrowLeft, FaCalendarAlt } from 'react-icons/fa';
 import '../globalStyles.css'; // Ensure the global styles are imported
 
 const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) => {
@@ -26,13 +26,13 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const [improvedContent, setImprovedContent] = useState('');
   const [showingPreview, setShowingPreview] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [reviewDate, setReviewDate] = useState('');
+  const [setReviewReminder, setSetReviewReminder] = useState(false);
 
   const quillRef = useRef(null);
   const fileInputRef = useRef(null);
 
-
   const navigate = useNavigate();
-  
 
   // Optionally fetch teams that the user belongs to so they can choose which team this document is for.
   useEffect(() => {
@@ -62,7 +62,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
     }
 
     setCreating(true);
-    
+
     const formData = new FormData();
     formData.append('title', title);
 
@@ -71,6 +71,11 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
     }
 
     formData.append('text_content', textContent);
+
+    // Add review date if enabled
+    if (setReviewReminder && reviewDate) {
+      formData.append('review_date', reviewDate);
+    }
 
     try {
       const res = await axiosInstance.post(
@@ -92,11 +97,11 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   };
 
   const handleFileUpload = (e) => {
-      // Hide any existing preview
+    // Hide any existing preview
     setShowingPreview(false);
     setOriginalContent('');
     setImprovedContent('');
-    
+
     // Reset summary as well
     setSummary('');
 
@@ -113,12 +118,11 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   };
 
   const handleGenerateSOP = () => {
-
     // Hide any existing preview
     setShowingPreview(false);
     setOriginalContent('');
     setImprovedContent('');
-    
+
     // Reset summary as well
     setSummary('');
 
@@ -126,29 +130,29 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   };
 
   const handleImproveSOP = async () => {
-      // Hide any existing summary
+    // Hide any existing summary
     setSummary('');
-    
+
     // Reset existing preview (if any)
     setShowingPreview(false);
     setOriginalContent('');
     setImprovedContent('');
-  
+
     setImproving(true);
     try {
       // Store the original content before improving
       setOriginalContent(textContent);
-      
+
       const res = await axiosInstance.post(
         '/api/improve-sop/',
         { content: textContent },
         { withCredentials: true }
       );
-      
+
       // Store the improved content
       const improvedHtml = formatMarkdownToHTML(res.data.improved);
       setImprovedContent(improvedHtml);
-      
+
       // Show the preview instead of directly applying changes
       setShowingPreview(true);
     } catch (err) {
@@ -162,34 +166,32 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   const acceptImprovedSOP = () => {
     // Apply the improved content
     const quill = quillRef.current.getEditor();
-  
+
     // Clear existing content
     quill.setText('');
-    
+
     // Insert the HTML directly at position 0 (beginning of editor)
     quill.clipboard.dangerouslyPasteHTML(0, improvedContent);
     setTextContent(improvedContent);
-    
+
     // Reset the preview state
     setShowingPreview(false);
     setOriginalContent('');
     setImprovedContent('');
   };
-  
+
   const discardImprovedSOP = () => {
     // Keep the original content
     // No need to update the editor since we never changed it
-    
+
     // Reset the preview state
     setShowingPreview(false);
     setOriginalContent('');
     setImprovedContent('');
   };
 
-
-  
   const handleSummariseSOP = async () => {
-  // Hide any existing preview
+    // Hide any existing preview
     setShowingPreview(false);
     setOriginalContent('');
     setImprovedContent('');
@@ -209,20 +211,19 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
       setSummarising(false);
     }
   };
-  
+
   const handleGoBack = () => {
     navigate(-1); // This navigates back one step in history
   };
-  
 
   return (
     <div className="container mt-5 entry-container">
-      <FaArrowLeft 
-                                  className="back-arrow" 
-                                  onClick={handleGoBack} 
-                                  style={{ cursor: 'pointer' }}
-                                  title="Go back to previous page" 
-                              />
+      <FaArrowLeft
+        className="back-arrow"
+        onClick={handleGoBack}
+        style={{ cursor: 'pointer' }}
+        title="Go back to previous page"
+      />
       <div className="card create-document-card p-4 w-100" style={{ maxWidth: '1200px' }}>
         <h4 className="mb-4">Create Document</h4>
 
@@ -252,6 +253,39 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Review Date Section */}
+        <div className="mb-4 border rounded p-3 bg-light-subtle" style={{ padding: '1rem' }}>
+          <div className="form-check mb-2">
+            <input
+              type="checkbox"
+              className="form-check-input"
+              id="setReviewReminder"
+              checked={setReviewReminder}
+              onChange={(e) => setSetReviewReminder(e.target.checked)}
+            />
+            <label className="form-check-label" htmlFor="setReviewReminder">
+              <FaCalendarAlt className="me-1" /> Set Review Reminder
+            </label>
+          </div>
+
+          {setReviewReminder && (
+            <div className="mt-2">
+              <label htmlFor="reviewDate" className="form-label">Review Date</label>
+              <input
+                type="date"
+                className="form-control"
+                id="reviewDate"
+                value={reviewDate}
+                onChange={(e) => setReviewDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+              />
+              <div className="form-text text-muted">
+                A reminder will be sent 14 days before the review date.
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="border rounded p-3 mb-4 bg-light-subtle" style={{ padding: '1.5rem' }}>
@@ -314,15 +348,14 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                     </button>
                   </li>
                   <li>
-                  <button className="dropdown-item" onClick={handleSummariseSOP}>
-                    📄 Summarise SOP
-                  </button>
+                    <button className="dropdown-item" onClick={handleSummariseSOP}>
+                      📄 Summarise SOP
+                    </button>
                   </li>
                 </ul>
               </div>
             </div>
           </div>
-
 
           {/* Spinner for Improving SOP */}
           {improving && (
@@ -367,20 +400,20 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           )}
         </div>
 
-        {/* Improved SOP Preview - MOVED HERE */}
+        {/* Improved SOP Preview */}
         {showingPreview && improvedContent && (
           <div className="mt-4 mb-4">
             <div className="alert alert-info">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="mb-0">✨ Improved SOP Preview</h6>
                 <div className="d-flex gap-2">
-                  <button 
+                  <button
                     className="btn btn-success btn-sm"
                     onClick={acceptImprovedSOP}
                   >
                     Accept Changes
                   </button>
-                  <button 
+                  <button
                     className="btn btn-outline-secondary btn-sm"
                     onClick={discardImprovedSOP}
                   >
@@ -388,7 +421,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                   </button>
                 </div>
               </div>
-              
+
               <div className="border rounded p-3 bg-white" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                 <div dangerouslySetInnerHTML={{ __html: improvedContent }} />
               </div>
@@ -426,8 +459,8 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
         </div>
 
         <div className="text-end mt-5 mb-2">
-          <button 
-            className="btn btn-success px-4" 
+          <button
+            className="btn btn-success px-4"
             onClick={handleSubmit}
             disabled={creating} // Disable button while creating
           >
@@ -441,10 +474,10 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
             )}
           </button>
         </div>
-        </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
 const mapStateToProps = (state) => ({
   isAuthenticated: state.auth.isAuthenticated,

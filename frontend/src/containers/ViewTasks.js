@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
-import TaskTable from '../components/TaskTable'; // Import the new component
+import TaskTable from '../components/TaskTable';
 import { fetchTasks } from '../actions/task';
 import { fetchTeams } from '../actions/team';
 
 const ViewTasks = ({ isAuthenticated, userTasks, teamTasks, fetchTasks, fetchTeams }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
+    const [filteredUserTasks, setFilteredUserTasks] = useState([]);
+    const [filteredTeamTasks, setFilteredTeamTasks] = useState([]);
+    
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -25,6 +27,33 @@ const ViewTasks = ({ isAuthenticated, userTasks, teamTasks, fetchTasks, fetchTea
 
         fetchData();
     }, [fetchTasks, fetchTeams]);
+    
+    // Filter tasks when userTasks or teamTasks change
+    useEffect(() => {
+        // Filter out tasks that are both complete AND past due date
+        const today = new Date();
+        
+        const filterTasks = (tasks) => {
+            if (!tasks) return [];
+            
+            return tasks.filter(task => {
+                // If task is not complete, include it
+                if (task.status !== 'complete') return true;
+                
+                // If task is complete, include only if due date is in the future
+                const dueDate = new Date(task.due_date);
+                return dueDate > today;
+            });
+        };
+        
+        if (userTasks) {
+            setFilteredUserTasks(filterTasks(userTasks));
+        }
+        
+        if (teamTasks) {
+            setFilteredTeamTasks(filterTasks(teamTasks));
+        }
+    }, [userTasks, teamTasks]);
 
     if (!isAuthenticated) {
         return <Navigate to="/login" />;
@@ -51,14 +80,14 @@ const ViewTasks = ({ isAuthenticated, userTasks, teamTasks, fetchTasks, fetchTea
                             </Link>
                         </div>  
                         <TaskTable 
-                            tasks={userTasks} 
-                            emptyMessage="You have no tasks" 
+                            tasks={filteredUserTasks} 
+                            emptyMessage="You have no active tasks" 
                         />
 
                         <h2 className="mt-5">Team Tasks</h2>
                         <TaskTable 
-                            tasks={teamTasks} 
-                            emptyMessage="Your teams have no tasks" 
+                            tasks={filteredTeamTasks} 
+                            emptyMessage="Your teams have no active tasks" 
                         />
                     </div>
                 </div>

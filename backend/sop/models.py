@@ -135,6 +135,8 @@ class Document(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
+    review_date = models.DateField(null=True, blank=True)  # New field for review date
+    review_reminder_sent = models.BooleanField(default=False)  # Track if reminder has been sent
 
     def __str__(self):
         return self.title

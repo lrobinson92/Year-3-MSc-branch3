@@ -252,3 +252,8 @@ LOGGING = {
         },
     },
 }
+
+# Add to settings.py if using django-crontab
+CRONJOBS = [
+    ('0 7 * * *', 'django.core.management.call_command', ['send_review_reminders'], {}, '>> /path/to/logs/review_reminders.log 2>&1')
+]

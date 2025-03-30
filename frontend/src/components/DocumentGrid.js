@@ -104,6 +104,17 @@ const DocumentGrid = ({
                                 </p>
                             )}
                             <small>Last updated: {formatDate(doc.updated_at || doc.created_at)}</small>
+                            {doc.review_date && (
+                                <div className="text-muted small mt-1">
+                                    <strong>Review date:</strong> {formatDate(doc.review_date)}
+                                    {doc.days_until_review <= 14 && doc.days_until_review > 0 && (
+                                        <span className="badge bg-warning ms-2">Review soon</span>
+                                    )}
+                                    {doc.days_until_review <= 0 && (
+                                        <span className="badge bg-danger ms-2">Review overdue</span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
