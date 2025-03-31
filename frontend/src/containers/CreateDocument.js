@@ -8,6 +8,7 @@ import 'react-quill/dist/quill.snow.css';
 import { uploadDocument, generateSOP } from '../actions/googledrive';
 import { FaArrowLeft, FaCalendarAlt } from 'react-icons/fa';
 import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
+import htmlDocx from 'html-docx-js/dist/html-docx';
 import '../globalStyles.css'; // Ensure the global styles are imported
 
 const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) => {
@@ -78,9 +79,8 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
       formData.append('team_id', teamId);
     }
     
-    // Don't manipulate the HTML content from ReactQuill - send it as is
-    // ReactQuill already provides proper HTML format
     formData.append('text_content', textContent);
+    formData.append('content_type', 'html'); // Add this to tell backend it's HTML
     
     if (setReviewReminder && reviewDate) {
       formData.append('review_date', reviewDate);

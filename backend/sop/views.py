@@ -289,12 +289,13 @@ class GoogleDriveUploadView(APIView):
 
     def post(self, request):
         try:
-            # Get title, team id, and file/text from the request.
+            # Get form data
             title = request.data.get('title')
             team_id = request.data.get('team_id', None)
             file_obj = request.FILES.get('file')
             text_content = request.data.get('text_content')
-            review_date = request.data.get('review_date')  # Get review date
+            content_type = request.data.get('content_type')  # HTML or plain text
+            review_date = request.data.get('review_date')
             
             if not title:
                 return Response({"error": "Title is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -325,85 +326,215 @@ class GoogleDriveUploadView(APIView):
             gauth.credentials = credentials
             drive = GoogleDrive(gauth)
             
-            # Create a new Google Docs file by specifying the Google Docs MIME type.
-            # This helps Google Drive convert Word files into an editable Google Docs format.
-            if text_content:
-                # For text input, create a Google Doc directly.
-                gfile = drive.CreateFile({'title': title})
-                gfile.SetContentString(text_content)
-            else:
-                # For a file upload, do NOT specify a mimeType; let Google detect it and convert.
-                gfile = drive.CreateFile({'title': title})
-                import tempfile
-                with tempfile.NamedTemporaryFile(delete=False) as temp:
-                    for chunk in file_obj.chunks():
-                        temp.write(chunk)
-                    temp.flush()
-                    file_path = temp.name
-                gfile.SetContentFile(file_path)
+            # Create file in Google Drive - don't specify mimeType yet
+            gfile = drive.CreateFile({'title': title})
             
-            # Upload with conversion enabled.
-            #gfile.Upload({'convert': True})
-
-             # Retry upload (with conversion) up to max_attempts.
+            # Create a temporary file
+            temp_file = None
+            file_path = None
+            mime_type = 'text/plain'  # Default MIME type
+            
+            try:
+                if text_content:
+                    # For HTML content, write to a temporary HTML file
+                    if content_type == 'html':
+                        # Fix the HTML content structure
+                        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{title}</title>
+</head>
+<body>
+{text_content}
+</body>
+</html>"""
+                        
+                        # Use .html extension for HTML files
+                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+                        temp_file.write(html_content.encode('utf-8'))
+                        temp_file.flush()
+                        file_path = temp_file.name
+                        mime_type = 'text/html'  # Set HTML MIME type
+                    else:
+                        # Plain text
+                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
+                        temp_file.write(text_content.encode('utf-8'))
+                        temp_file.flush()
+                        file_path = temp_file.name
+                        mime_type = 'text/plain'  # Set plain text MIME type
+                        
+                elif file_obj:
+                    # For a file upload, write to a temporary file
+                    suffix = '.' + file_obj.name.split('.')[-1].lower()
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                    for chunk in file_obj.chunks():
+                        temp_file.write(chunk)
+                    temp_file.flush()
+                    file_path = temp_file.name
+                    
+                    # Determine MIME type based on file extension
+                    if suffix == '.docx':
+                        mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    elif suffix == '.doc':
+                        mime_type = 'application/msword'
+                    elif suffix == '.pdf':
+                        mime_type = 'application/pdf'
+                    elif suffix == '.txt':
+                        mime_type = 'text/plain'
+                    elif suffix == '.html' or suffix == '.htm':
+                        mime_type = 'text/html'
+                    else:
+                        # Default to binary for unknown types
+                        mime_type = 'application/octet-stream'
+                
+                # Explicitly set the content file with the correct MIME type
+                gfile.SetContentFile(file_path)
+                gfile['mimeType'] = mime_type
+                
+            finally:
+                if temp_file:
+                    temp_file.close()
+            
+            # Upload with conversion enabled
             max_attempts = 3
             for attempt in range(max_attempts):
                 try:
                     gfile.Upload({'convert': True})
-                    break  # if successful, exit the loop
+                    break
                 except Exception as upload_error:
-                    logger.error("Upload attempt %s failed: %s", attempt + 1, upload_error)
+                    logger.error("Upload attempt %s failed: %s", attempt + 1, upload_error, exc_info=True)
                     if attempt == max_attempts - 1:
-                        return Response({"error": "Failed to upload file after multiple attempts: " + str(upload_error)},
-                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                        return Response({"error": f"Failed to upload file after {max_attempts} attempts: {str(upload_error)}"},
+                                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                     time.sleep(2)  # wait before retrying
-
-            # Insert permission to allow anyone to view the document.
+            
+            # After successful upload, convert to Google Docs format
+            try:
+                # Get the file ID
+                file_id = gfile['id']
+                
+                # Convert to Google Docs format by copying
+                url = f"https://www.googleapis.com/drive/v2/files/{file_id}/copy"
+                headers = {
+                    'Authorization': f'Bearer {credentials.access_token}',
+                    'Content-Type': 'application/json'
+                }
+                payload = {
+                    'title': title,
+                    'mimeType': 'application/vnd.google-apps.document'
+                }
+                
+                response = requests.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                
+                # Get the new file ID and delete the original file
+                result = response.json()
+                new_file_id = result.get('id')
+                
+                # Update gfile to point to the new converted file
+                if new_file_id:
+                    # Delete original file
+                    gfile.Delete()
+                    
+                    # Update to the new Google Doc
+                    gfile = drive.CreateFile({'id': new_file_id})
+                    drive_file_id = new_file_id
+                else:
+                    drive_file_id = gfile['id']
+            except Exception as e:
+                # If conversion fails, keep the original file
+                logger.warning("Failed to convert to Google Docs format: %s", e)
+                drive_file_id = gfile['id']
+            
+            # Insert permission to allow anyone to view the document
             permission = {
                 'type': 'anyone',
                 'role': 'writer'
             }
             gfile.InsertPermission(permission)
             
-            # Retry fetching metadata up to max_attempts.
-            file_url = None
-            for attempt in range(max_attempts):
-                time.sleep(2)  # Add a delay before fetching metadata
-                gfile.FetchMetadata(fields='id, webViewLink, webContentLink, title')
-                file_url = gfile.get('alternateLink') or gfile.get('embedLink')
-                logger.info("Attempt %s: Fetched file URL: %s", attempt + 1, file_url)
-                if file_url:
-                    break
-
-            if not file_url:
-                logger.error("No public file URL returned from Google Drive after %s attempts.", max_attempts)
-                return Response({"error": "File URL not generated by Google Drive."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            drive_file_id = gfile.get('id')
-
-            # Optionally remove the temporary file if used.
-            if file_obj and not text_content:
+            # Clean up the temporary file
+            if file_path:
                 try:
                     os.remove(file_path)
                 except Exception as e:
                     logger.warning("Could not remove temporary file: %s", e)
             
-            # Save metadata in your database.
+            # Retry fetching metadata up to max_attempts
+            file_url = None
+            for attempt in range(max_attempts):
+                try:
+                    time.sleep(2)  # Add a delay before fetching metadata
+                    gfile.FetchMetadata(fields='id, webViewLink, webContentLink, alternateLink, embedLink')
+                    
+                    # Try multiple fields that might contain the URL
+                    file_url = (gfile.get('webViewLink') or 
+                               gfile.get('alternateLink') or 
+                               gfile.get('embedLink'))
+                    
+                    logger.info("Attempt %s: Fetched file metadata: %s", attempt + 1, {
+                        'id': gfile.get('id'),
+                        'webViewLink': gfile.get('webViewLink'),
+                        'webContentLink': gfile.get('webContentLink'),
+                        'alternateLink': gfile.get('alternateLink'),
+                        'embedLink': gfile.get('embedLink')
+                    })
+                    
+                    if file_url:
+                        logger.info("Successfully found URL: %s", file_url)
+                        break
+                        
+                    # If webViewLink not available, manually construct the URL
+                    if not file_url and gfile.get('id'):
+                        file_url = f"https://docs.google.com/document/d/{gfile.get('id')}/edit"
+                        logger.info("Manually constructed URL: %s", file_url)
+                        break
+                except Exception as e:
+                    logger.error("Error fetching metadata: %s", e)
+                    
+                # If last attempt, try a different approach
+                if attempt == max_attempts - 1 and not file_url and gfile.get('id'):
+                    try:
+                        # Try direct API call to get sharing link
+                        url = f"https://www.googleapis.com/drive/v3/files/{gfile.get('id')}?fields=webViewLink"
+                        headers = {'Authorization': f'Bearer {credentials.access_token}'}
+                        response = requests.get(url, headers=headers)
+                        response.raise_for_status()
+                        data = response.json()
+                        file_url = data.get('webViewLink')
+                        logger.info("Retrieved URL via direct API: %s", file_url)
+                    except Exception as e:
+                        logger.error("Failed to retrieve URL via direct API: %s", e)
+                        # Last resort - construct URL manually
+                        file_url = f"https://docs.google.com/document/d/{gfile.get('id')}/edit"
+                        logger.info("Last resort manual URL: %s", file_url)
+
+            if not file_url and gfile.get('id'):
+                # If we still don't have a URL but have an ID, construct it
+                file_url = f"https://docs.google.com/document/d/{gfile.get('id')}/edit"
+                logger.warning("No URL from Google Drive API. Using constructed URL: %s", file_url)
+
+            if not file_url:
+                logger.error("No file URL could be generated from Google Drive.")
+                return Response({"error": "File URL not generated by Google Drive."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Save metadata to database
             document = Document.objects.create(
                 title=title,
                 file_url=file_url,
                 google_drive_file_id=drive_file_id,
                 owner=request.user,
                 team=team,
-                review_date=review_date if review_date else None  # Save review date
+                review_date=review_date if review_date else None
             )
             
             serializer = DocumentSerializer(document)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
+            
         except Exception as e:
             logger.error("Error in GoogleDriveUploadView: %s", e, exc_info=True)
-            return Response({"error": "An internal error occurred: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GenerateSOPView(APIView):
@@ -567,3 +698,79 @@ class GoogleDriveFileContentView(APIView):
             return Response({"error": "Failed to retrieve document content."}, status=500)
 
         return Response({"title":document.title, "content": content, "file_url": document.file_url}, status=200)
+
+class DocumentDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, document_id):
+        try:
+            # Get the document
+            document = get_object_or_404(Document, id=document_id)
+            
+            # Check if user has permission to delete
+            if request.user != document.owner:
+                # Check if user is team owner
+                if document.team:
+                    team_member = TeamMember.objects.filter(
+                        team=document.team,
+                        user=request.user,
+                        role='owner'
+                    ).first()
+                    
+                    if not team_member:
+                        return Response(
+                            {"error": "You don't have permission to delete this document."},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                else:
+                    # Not a team document and user is not the owner
+                    return Response(
+                        {"error": "You don't have permission to delete this document."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            # Get Google Drive credentials
+            creds_json = request.session.get('google_drive_credentials')
+            if not creds_json:
+                return Response(
+                    {"error": "Not authenticated with Google Drive."},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            try:
+                credentials = OAuth2Credentials.from_json(creds_json)
+            except Exception as e:
+                logger.error("Failed to load Google Drive credentials: %s", e)
+                return Response(
+                    {"error": "Invalid Google Drive credentials."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Delete from Google Drive if file ID exists
+            if document.google_drive_file_id:
+                try:
+                    # Initialize PyDrive
+                    gauth = GoogleAuth()
+                    gauth.credentials = credentials
+                    drive = GoogleDrive(gauth)
+                    
+                    # Get the file
+                    gfile = drive.CreateFile({'id': document.google_drive_file_id})
+                    
+                    # Delete the file
+                    gfile.Delete()
+                except Exception as e:
+                    logger.error("Error deleting file from Google Drive: %s", e)
+                    # Continue with database deletion even if Drive deletion fails
+            
+            # Delete from database
+            document.delete()
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            logger.error("Error in DocumentDeleteView: %s", e)
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

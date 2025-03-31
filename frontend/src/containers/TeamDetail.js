@@ -7,11 +7,13 @@ import DocumentGrid from '../components/DocumentGrid';
 import axiosInstance from '../utils/axiosConfig';
 import { formatDate, toTitleCase } from '../utils/utils';
 import { fetchTeams } from '../actions/team';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaTrash } from 'react-icons/fa';
 import { FcGoogle } from 'react-icons/fc';
-import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils'; // Import the redirect utility
+import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
+import Modal from 'react-bootstrap/Modal';
+import Button from 'react-bootstrap/Button';
 
-const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => { // Add driveLoggedIn prop
+const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
     const { teamId } = useParams();
     const [team, setTeam] = useState(null);
     const [members, setMembers] = useState([]);
@@ -21,8 +23,14 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => { /
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    
+    // Add document deletion state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [documentToDelete, setDocumentToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState(null);
 
-    // Add handler function for Google Drive authentication
+    // Handle document click with Google Drive auth logic
     const handleDocumentClick = (doc) => {
         if (!driveLoggedIn) {
             // Save the current URL for returning after login
@@ -31,6 +39,59 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => { /
             // Navigate to the document viewer if already logged in
             navigate(`/view/sop/${doc.id}`);
         }
+    };
+    
+    // Check if user can delete document
+    const canDeleteDocument = (document) => {
+        if (!user) return false;
+        
+        // User is document owner
+        if (document.owner === user.id) return true;
+        
+        // User is team owner
+        if (team) {
+            const userMembership = team.members?.find(member => member.user === user.id);
+            return userMembership?.role === 'owner';
+        }
+        
+        return false;
+    };
+
+    // Handle delete button click
+    const handleDeleteClick = (document) => {
+        setDocumentToDelete(document);
+        setShowDeleteModal(true);
+        setDeleteError(null);
+    };
+
+    // Handle confirming document deletion
+    const handleConfirmDelete = async () => {
+        if (!documentToDelete) return;
+        
+        setIsDeleting(true);
+        setDeleteError(null);
+        
+        try {
+            await axiosInstance.delete(
+                `${process.env.REACT_APP_API_URL}/api/documents/${documentToDelete.id}/`,
+                { withCredentials: true }
+            );
+            
+            // Update documents after deletion
+            setDocuments(documents.filter(doc => doc.id !== documentToDelete.id));
+            setShowDeleteModal(false);
+        } catch (err) {
+            console.error('Error deleting document:', err);
+            setDeleteError('Failed to delete document. Please try again.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    // Document action handlers for DocumentGrid
+    const documentActions = {
+        onDelete: handleDeleteClick,
+        canDelete: canDeleteDocument
     };
 
     useEffect(() => {
@@ -132,7 +193,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => { /
                             <h2>Team Tasks</h2>
                             <Link 
                                 to={`/create-task?teamId=${teamId}`} 
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-sm btn-outline-primary d-flex align-items-center"
                             >
                                 <FaPlus className="me-1" /> Create Task
                             </Link>
@@ -177,12 +238,40 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => { /
                             showCreateButton={false}
                             teamId={teamId}
                             showTeamName={false}
-                            onDocumentClick={handleDocumentClick} // Add custom click handler
-                            driveLoggedIn={driveLoggedIn} // Pass down Google Drive login status
+                            onDocumentClick={handleDocumentClick}
+                            driveLoggedIn={driveLoggedIn}
+                            actions={documentActions} // Pass document actions
                         />
                     </div>
                 </div>
             </div>
+            
+            {/* Delete Confirmation Modal */}
+            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Delete Document</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p>Are you sure you want to delete <strong>{documentToDelete?.title}</strong>?</p>
+                    <p className="text-danger">This action cannot be undone.</p>
+                    {deleteError && <div className="alert alert-danger mt-3">{deleteError}</div>}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>
+                        Cancel
+                    </Button>
+                    <Button variant="danger" onClick={handleConfirmDelete} disabled={isDeleting}>
+                        {isDeleting ? (
+                            <>
+                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Deleting...
+                            </>
+                        ) : (
+                            'Delete Document'
+                        )}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };
@@ -190,7 +279,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => { /
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
     user: state.auth.user,
-    driveLoggedIn: state.googledrive.driveLoggedIn // Add Google Drive authentication status
+    driveLoggedIn: state.googledrive.driveLoggedIn
 });
 
 export default connect(mapStateToProps, { fetchTeams })(TeamDetail);
