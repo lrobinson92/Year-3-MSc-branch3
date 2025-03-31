@@ -37,7 +37,7 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                 const userTasks = tasksRes.data.user_tasks;
                 const filteredTasks = userTasks.filter(task => task.status !== 'complete');
                 const sortedTasks = filteredTasks.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
-                setTasks(sortedTasks.slice(0, 5)); // Show top 5 upcoming tasks
+                setTasks(sortedTasks.slice(0, 6)); // Show top 6 upcoming tasks
                 
                 // Update active tasks stat
                 setStats(prev => ({...prev, activeTasks: filteredTasks.length}));
@@ -49,10 +49,18 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                     const dateB = new Date(b.updated_at || b.created_at);
                     return dateB - dateA;
                 });
-                setDocuments(sortedDocs.slice(0, 3)); // Show 3 most recent documents
+                setDocuments(sortedDocs.slice(0, 6)); // Show 6 most recent documents
                 
                 // Update total SOPs stat
                 setStats(prev => ({...prev, totalSOPs: docsRes.data.length}));
+                
+                // Fetch teams to get the count
+                const teamsRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, { withCredentials: true });
+                
+                // Update team count stat - count the number of teams the user is in
+                if (teamsRes.data && Array.isArray(teamsRes.data)) {
+                    setStats(prev => ({...prev, teamCount: teamsRes.data.length}));
+                }
                 
             } catch (err) {
                 console.error('Failed to fetch data:', err);
