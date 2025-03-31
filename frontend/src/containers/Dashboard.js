@@ -6,7 +6,7 @@ import DocumentGrid from '../components/DocumentGrid';
 import { resetFirstLogin } from '../actions/auth';
 import { connect } from 'react-redux';
 import axiosInstance from '../utils/axiosConfig';
-import { FaFileAlt, FaTasks, FaUsers, FaPlus } from 'react-icons/fa';
+import { FaFileAlt, FaTasks, FaUsers, FaPlus, FaBell, FaClock } from 'react-icons/fa';
 
 const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
     const [tasks, setTasks] = useState([]);
@@ -15,7 +15,9 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
     const [stats, setStats] = useState({
         totalSOPs: 0,
         activeTasks: 0,
-        teamCount: 0
+        teamCount: 0,
+        sopsForReview: 0,
+        tasksDueSoon: 0
     });
     const navigate = useNavigate();
     
@@ -42,6 +44,18 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                 // Update active tasks stat
                 setStats(prev => ({...prev, activeTasks: filteredTasks.length}));
                 
+                // Calculate tasks due in next 7 days
+                const now = new Date();
+                const nextWeek = new Date();
+                nextWeek.setDate(now.getDate() + 7);
+                
+                const tasksDueSoon = filteredTasks.filter(task => {
+                    const dueDate = new Date(task.due_date);
+                    return dueDate >= now && dueDate <= nextWeek;
+                }).length;
+                
+                setStats(prev => ({...prev, tasksDueSoon}));
+                
                 // Fetch documents
                 const docsRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/documents/`, { withCredentials: true });
                 const sortedDocs = docsRes.data.sort((a, b) => {
@@ -53,6 +67,19 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                 
                 // Update total SOPs stat
                 setStats(prev => ({...prev, totalSOPs: docsRes.data.length}));
+                
+                // Calculate SOPs due for review in next 14 days
+                const twoWeeksLater = new Date();
+                twoWeeksLater.setDate(now.getDate() + 14);
+                
+                const sopsForReview = docsRes.data.filter(doc => {
+                    if (!doc.review_date) return false;
+                    
+                    const reviewDate = new Date(doc.review_date);
+                    return reviewDate >= now && reviewDate <= twoWeeksLater;
+                }).length;
+                
+                setStats(prev => ({...prev, sopsForReview}));
                 
                 // Fetch teams to get the count
                 const teamsRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, { withCredentials: true });
@@ -94,7 +121,6 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                     <p className="text-white-50 mb-0">Welcome back, {user?.name || 'User'}</p>
                                 </div>
                                 <div className="d-flex gap-2">
-
                                     <Link to="/create-document" className="btn btn-light btn-sm d-flex align-items-center">
                                         <FaPlus className="me-1" /> New SOP
                                     </Link>
@@ -106,7 +132,8 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                     <div className="container-fluid px-4">
                         {/* Stats Cards in a Single Row */}
                         <div className="row g-4 mb-4">
-                            <div className="col-md-4">
+                            {/* Total SOPs */}
+                            <div className="col-md-4 col-lg">
                                 <Link to="/view/documents" className="text-decoration-none">
                                     <div className="card border-0 shadow-sm h-100 transition-hover">
                                         <div className="card-body d-flex align-items-center">
@@ -122,7 +149,9 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                     </div>
                                 </Link>
                             </div>
-                            <div className="col-md-4">
+                            
+                            {/* Active Tasks */}
+                            <div className="col-md-4 col-lg">
                                 <Link to="/view/tasks" className="text-decoration-none">
                                     <div className="card border-0 shadow-sm h-100 transition-hover">
                                         <div className="card-body d-flex align-items-center">
@@ -138,7 +167,9 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                     </div>
                                 </Link>
                             </div>
-                            <div className="col-md-4">
+                            
+                            {/* Teams */}
+                            <div className="col-md-4 col-lg">
                                 <Link to="/view/teams" className="text-decoration-none">
                                     <div className="card border-0 shadow-sm h-100 transition-hover">
                                         <div className="card-body d-flex align-items-center">
@@ -154,12 +185,49 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                     </div>
                                 </Link>
                             </div>
+                            
+                            {/* SOPs Due for Review */}
+                            <div className="col-md-6 col-lg">
+                                <Link to="/view/documents" className="text-decoration-none">
+                                    <div className="card border-0 shadow-sm h-100 transition-hover">
+                                        <div className="card-body d-flex align-items-center">
+                                            <div className="rounded-circle d-flex justify-content-center align-items-center me-3" 
+                                                style={{ width: '48px', height: '48px', backgroundColor: 'rgba(97, 95, 216, 0.15)' }}>
+                                                <FaBell style={{ color: brandPurple }} size={22} />
+                                            </div>
+                                            <div>
+                                                <h6 className="text-muted mb-1">SOPs Due Review</h6>
+                                                <h4 className="mb-0 text-dark">{stats.sopsForReview}</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            </div>
+                            
+                            {/* Tasks Due Soon */}
+                            <div className="col-md-6 col-lg">
+                                <Link to="/view/tasks" className="text-decoration-none">
+                                    <div className="card border-0 shadow-sm h-100 transition-hover">
+                                        <div className="card-body d-flex align-items-center">
+                                            <div className="rounded-circle d-flex justify-content-center align-items-center me-3" 
+                                                style={{ width: '48px', height: '48px', backgroundColor: 'rgba(97, 95, 216, 0.15)' }}>
+                                                <FaClock style={{ color: brandPurple }} size={22} />
+                                            </div>
+                                            <div>
+                                                <h6 className="text-muted mb-1">Tasks Due Soon</h6>
+                                                <h4 className="mb-0 text-dark">{stats.tasksDueSoon}</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            </div>
                         </div>
                         
-                        {/* Featured Content Cards - 2-column layout with improved styling */}
+                        {/* Featured Content Cards - 60/40 split that aligns with stats cards */}
                         <div className="row g-4">
-                            {/* Featured Documents Card - Left Column */}
+                            {/* Reviews Card - Wider (60%) */}
                             <div className="col-lg-7">
+                                {/* Featured Documents Card */}
                                 <div className="card border-0 shadow-sm h-100">
                                     <div className="card-header bg-white d-flex justify-content-between align-items-center py-3">
                                         <h5 className="mb-0 d-flex align-items-center">
@@ -254,8 +322,9 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                 </div>
                             </div>
                             
-                            {/* Upcoming Tasks Card - Right Column */}
+                            {/* Tasks Card - Narrower (40%) */}
                             <div className="col-lg-5">
+                                {/* Upcoming Tasks Card */}
                                 <div className="card border-0 shadow-sm h-100">
                                     <div className="card-header bg-white d-flex justify-content-between align-items-center py-3">
                                         <h5 className="mb-0 d-flex align-items-center">
