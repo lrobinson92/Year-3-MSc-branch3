@@ -74,6 +74,14 @@ class TeamViewSet(viewsets.ModelViewSet):
         email = request.data.get('email')
         role = request.data.get('role', 'member')
 
+        # Check if the requesting user is a team owner
+        try:
+            membership = TeamMembership.objects.get(team=team, user=request.user)
+            if membership.role != 'owner':
+                return Response({'error': 'Only team owners can invite members.'}, status=status.HTTP_403_FORBIDDEN)
+        except TeamMembership.DoesNotExist:
+            return Response({'error': 'You are not a member of this team.'}, status=status.HTTP_403_FORBIDDEN)
+
         if role not in dict(TeamMembership.ROLE_CHOICES):
             return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -104,7 +112,7 @@ class TeamViewSet(viewsets.ModelViewSet):
             fail_silently=False,
         )
 
-        return Response({'message': 'Invitation sent and user added to the team'}, status=status.HTTP_200_OK)   
+        return Response({'message': 'Invitation sent and user added to the team'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'], url_path='users-in-same-team')
     def users_in_same_team(self, request, pk=None):
@@ -231,6 +239,26 @@ class TaskViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(due_date__gte=due_after)
         
         return queryset
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        team = serializer.validated_data.get('team')
+        assigned_to = serializer.validated_data.get('assigned_to')
+
+        if team:
+            try:
+                membership = TeamMembership.objects.get(user=user, team=team)
+            except TeamMembership.DoesNotExist:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You are not a member of the selected team.")
+
+            # Only allow assigning to others if requester is team owner
+            if assigned_to and assigned_to != user:
+                if membership.role != 'owner':
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("Only team owners can assign tasks to other members.")
+
+        serializer.save()
     
     @action(detail=False, methods=['get'], url_path='user-and-team-tasks')
     def user_and_team_tasks(self, request):
