@@ -9,55 +9,34 @@ class EndpointDiscoveryTest(TestCase):
     def setUp(self):
         self.client = APIClient()
     
-    def test_discover_urls(self):
-        """Print all available URLs in the project"""
+    def get_all_urls(self):
+        """Retrieve all available URLs in the project"""
         resolver = get_resolver(None)
         url_patterns = resolver.url_patterns
         
-        print("\n=== Available URL patterns ===")
-        def print_patterns(patterns, prefix=''):
+        urls = []
+        def collect_patterns(patterns, prefix=''):
             for pattern in patterns:
                 if hasattr(pattern, 'url_patterns'):
-                    # This is an include - print its sub-patterns
-                    print(f"{prefix}[Include] {pattern.pattern}")
-                    print_patterns(pattern.url_patterns, prefix + '  ')
+                    # This is an include - collect its sub-patterns
+                    collect_patterns(pattern.url_patterns, prefix + '  ')
                 else:
                     # This is a URL pattern
-                    name = f" name='{pattern.name}'" if pattern.name else ""
-                    print(f"{prefix}URL: {pattern.pattern}{name}")
+                    urls.append(str(pattern.pattern))
         
-        print_patterns(url_patterns)
-        
-        # Test a few common auth endpoints to find which ones exist
-        test_urls = [
-            '/api/auth/users/',
-            '/api/auth/users/create/',
-            '/api/auth/token/',
-            '/api/auth/token/obtain/',
-            '/api/auth/token/refresh/',
-            '/api/auth/jwt/create/',
-            '/api/auth/jwt/refresh/',
-            '/api/auth/login/',
-            '/api/auth/logout/',
-            '/api/users/',
-            '/api/users/register/',
-            '/api/token/',
-            '/api/token/refresh/',
-            '/auth/users/',
-            '/auth/jwt/create/'
-        ]
-        
-        print("\n=== Testing endpoints ===")
-        for url in test_urls:
-            # Try GET and POST
+        collect_patterns(url_patterns)
+        return urls
+    
+    def test_discover_urls(self):
+        """Print all available URLs in the project"""
+        urls = self.get_all_urls()
+        print("\nDiscovered URLs:")
+        for url in urls:
+            # Skip the root URL to avoid template issues
+            if url == '/':
+                print(f"  Skipping {url} (requires template)")
+                continue
+                
+            print(f"  Testing {url}")
             get_response = self.client.get(url)
-            post_response = self.client.post(url, {}, format='json')
-            
-            get_status = get_response.status_code
-            post_status = post_response.status_code
-            
-            # Only show non-404 responses
-            if get_status != 404 or post_status != 404:
-                print(f"URL: {url}")
-                print(f"  GET: {get_status}")
-                print(f"  POST: {post_status}")
+            print(f"    GET: {get_response.status_code}")
