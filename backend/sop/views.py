@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from sop.serializers import UserCreateSerializer, DocumentSerializer
 from .models import UserAccount, Team, TeamMembership, Task, Document
-from .permissions import IsOwnerOrAssignedUser
+from .permissions import IsOwnerOrAssignedUser, IsTeamMemberOrTaskOwner
 from .serializers import TeamSerializer, TaskSerializer
 import docx2txt
 import json
@@ -188,24 +188,70 @@ class IsTeamOwner(BasePermission):
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all()
+    """ViewSet for managing tasks with proper filtering"""
     serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAssignedUser]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Task.objects.filter(
-            Q(assigned_to=user) | 
-            Q(team__team_memberships__user=user)
-        ).distinct()
+    permission_classes = [IsAuthenticated, IsTeamMemberOrTaskOwner]
     
-    @action(detail=False, methods=['get'], url_path='user-and-team-tasks', permission_classes=[IsAuthenticated])
+    def get_queryset(self):
+        """
+        Get tasks with filtering by query parameters:
+        - status: Filter by task status
+        - team: Filter by team ID
+        - assigned_to: Filter by assigned user ID
+        """
+        user = self.request.user
+        queryset = Task.objects.all()
+        
+        # Filter by status
+        status_param = self.request.query_params.get('status', None)
+        if status_param is not None:
+            queryset = queryset.filter(status=status_param)
+        
+        # Filter by team
+        team_param = self.request.query_params.get('team', None)
+        if team_param is not None:
+            queryset = queryset.filter(team_id=team_param)
+        
+        # Filter by assigned_to
+        assigned_to_param = self.request.query_params.get('assigned_to', None)
+        if assigned_to_param is not None:
+            if assigned_to_param.lower() == 'null':
+                # Handle case for unassigned tasks
+                queryset = queryset.filter(assigned_to__isnull=True)
+            else:
+                queryset = queryset.filter(assigned_to_id=assigned_to_param)
+                
+        # Filter by due date range
+        due_before = self.request.query_params.get('due_before', None)
+        if due_before is not None:
+            queryset = queryset.filter(due_date__lte=due_before)
+            
+        due_after = self.request.query_params.get('due_after', None)
+        if due_after is not None:
+            queryset = queryset.filter(due_date__gte=due_after)
+        
+        return queryset
+    
+    @action(detail=False, methods=['get'], url_path='user-and-team-tasks')
     def user_and_team_tasks(self, request):
         user = request.user
+
+        # All tasks assigned to the current user (personal or team-based)
         user_tasks = Task.objects.filter(assigned_to=user)
-        team_tasks = Task.objects.filter(team__team_memberships__user=user).exclude(assigned_to=user)
+
+        # All team tasks in user's teams NOT assigned to the user
+        user_teams = Team.objects.filter(members=user)
+        team_tasks = Task.objects.filter(team__in=user_teams).exclude(assigned_to=user)
+
+        # Optional status filter
+        status_param = request.query_params.get('status')
+        if status_param:
+            user_tasks = user_tasks.filter(status=status_param)
+            team_tasks = team_tasks.filter(status=status_param)
+
         user_tasks_serializer = TaskSerializer(user_tasks, many=True)
         team_tasks_serializer = TaskSerializer(team_tasks, many=True)
+
         return Response({
             'user_tasks': user_tasks_serializer.data,
             'team_tasks': team_tasks_serializer.data

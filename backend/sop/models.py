@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 class UserAccountManager(BaseUserManager):
     def create_user(self, email, name, password=None):
@@ -95,34 +96,37 @@ class TeamMembership(models.Model):
         return f"{self.user.name} - {self.role} in {self.team.name}"
 
 class Task(models.Model):
-    STATUS_CHOICES = [
-        ('not_started', 'Not Started'),
-        ('in_progress', 'In Progress'),
-        ('complete', 'Complete'),
-    ]
-
-    description = models.TextField(blank=True)
+    """Task model with status choices and required fields"""
+    
+    class Status(models.TextChoices):
+        NOT_STARTED = 'not_started', _('Not Started')
+        IN_PROGRESS = 'in_progress', _('In Progress')
+        COMPLETE = 'complete', _('Complete')
+    
+    description = models.CharField(max_length=255)
     assigned_to = models.ForeignKey(
-        UserAccount, 
-        on_delete=models.SET_NULL, 
-        related_name='tasks',
+        'UserAccount',
+        on_delete=models.SET_NULL,
         null=True,
-        blank=True
+        blank=True,
+        related_name='assigned_tasks'
     )
     team = models.ForeignKey(
-        Team,
+        'Team',
         on_delete=models.CASCADE,
-        related_name='tasks',
         null=True,
-        blank=True
+        blank=True,
+        related_name='team_tasks'
     )
     due_date = models.DateField()
     status = models.CharField(
-        max_length=20, 
-        choices=STATUS_CHOICES, 
-        default='not_started'
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NOT_STARTED
     )
-
+    created_at = models.DateTimeField(default=timezone.now)  # Not auto_now_add to allow migration
+    updated_at = models.DateTimeField(auto_now=True)
+    
     def __str__(self):
         return self.description
     

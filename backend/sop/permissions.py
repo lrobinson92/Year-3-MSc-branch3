@@ -1,4 +1,5 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework import permissions
 from .models import TeamMembership
 
 class IsOwnerOrAssignedUser(BasePermission):
@@ -34,3 +35,32 @@ class IsTeamOwner(BasePermission):
             team=obj, 
             role='owner'
         ).exists()
+
+class IsTeamMemberOrTaskOwner(permissions.BasePermission):
+    """
+    Allows:
+    - Full access if assigned to a personal task (no team)
+    - Read access if part of the task's team
+    - Write access only if user is the owner of the task's specific team
+    """
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+
+        # Personal task, assigned to this user
+        if obj.assigned_to == user and obj.team is None:
+            return True
+
+        # Team task
+        if obj.team:
+            try:
+                membership = TeamMembership.objects.get(user=user, team=obj.team)
+            except TeamMembership.DoesNotExist:
+                return False
+
+            if request.method in permissions.SAFE_METHODS:
+                return True
+
+            # ✅ Only allow write access if they are the owner of the task's team
+            return membership.role == 'owner'
+
+        return False

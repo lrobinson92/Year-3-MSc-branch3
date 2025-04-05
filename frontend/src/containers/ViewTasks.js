@@ -5,66 +5,27 @@ import Sidebar from '../components/Sidebar';
 import TaskTable from '../components/TaskTable';
 import { fetchTasks } from '../actions/task';
 import { fetchTeams } from '../actions/team';
+import { FaPlus, FaFilter } from 'react-icons/fa';
+import TaskFilterBar from '../components/TaskFilterBar';
 
-const ViewTasks = ({ isAuthenticated, userTasks, teamTasks, fetchTasks, fetchTeams }) => {
-    const [loading, setLoading] = useState(true);
+const ViewTasks = ({ isAuthenticated, userTasks, teamTasks, fetchTasks, fetchTeams, loading }) => {
     const [error, setError] = useState(null);
-    const [filteredUserTasks, setFilteredUserTasks] = useState([]);
-    const [filteredTeamTasks, setFilteredTeamTasks] = useState([]);
-    
+
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch both tasks and teams data
                 await Promise.all([fetchTasks(), fetchTeams()]);
             } catch (err) {
                 console.error(err);
                 setError('Failed to fetch data');
-            } finally {
-                setLoading(false);
             }
         };
 
         fetchData();
     }, [fetchTasks, fetchTeams]);
-    
-    // Filter tasks when userTasks or teamTasks change
-    useEffect(() => {
-        // Filter out tasks that are both complete AND past due date
-        const today = new Date();
-        
-        const filterTasks = (tasks) => {
-            if (!tasks) return [];
-            
-            return tasks.filter(task => {
-                // If task is not complete, include it
-                if (task.status !== 'complete') return true;
-                
-                // If task is complete, include only if due date is in the future
-                const dueDate = new Date(task.due_date);
-                return dueDate > today;
-            });
-        };
-        
-        if (userTasks) {
-            setFilteredUserTasks(filterTasks(userTasks));
-        }
-        
-        if (teamTasks) {
-            setFilteredTeamTasks(filterTasks(teamTasks));
-        }
-    }, [userTasks, teamTasks]);
 
     if (!isAuthenticated) {
         return <Navigate to="/login" />;
-    }
-
-    if (loading) {
-        return <div>Loading...</div>;
-    }
-
-    if (error) {
-        return <div>{error}</div>;
     }
 
     return (
@@ -72,23 +33,77 @@ const ViewTasks = ({ isAuthenticated, userTasks, teamTasks, fetchTasks, fetchTea
             <div className="d-flex">
                 <Sidebar />
                 <div className="main-content">
-                    <div className="recent-items-card">
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <h2>My Tasks</h2>
-                            <Link to="/create-task" className="btn btn-primary create-new-link">
-                                + Create New Task
+                    <div className="container-fluid pt-2 pb-1">
+                        <div className="d-flex justify-content-end">
+                            <button
+                                className="btn btn-outline-secondary me-2"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#filterCollapse"
+                                aria-expanded="false"
+                                aria-controls="filterCollapse"
+                            >
+                                <FaFilter className="me-1" /> Filters
+                            </button>
+                            <Link to="/create-task" className="btn btn-primary">
+                                <FaPlus className="me-1" /> Create New Task
                             </Link>
-                        </div>  
-                        <TaskTable 
-                            tasks={filteredUserTasks} 
-                            emptyMessage="You have no active tasks" 
-                        />
+                        </div>
 
-                        <h2 className="mt-5">Team Tasks</h2>
-                        <TaskTable 
-                            tasks={filteredTeamTasks} 
-                            emptyMessage="Your teams have no active tasks" 
-                        />
+                        <div className="collapse mb-3" id="filterCollapse">
+                            <div className="card card-body">
+                                <TaskFilterBar />
+                            </div>
+                        </div>
+
+                        {error && <div className="alert alert-danger">{error}</div>}
+
+                        {loading ? (
+                            <div className="d-flex justify-content-center my-5">
+                                <div className="spinner-border" role="status">
+                                    <span className="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="card mb-3">
+                                    <div className="card-header bg-white">
+                                        <h5 className="mb-0">My Tasks</h5>
+                                    </div>
+                                    <div className="card-body">
+                                        <TaskTable 
+                                            tasks={userTasks} 
+                                            emptyMessage="You have no tasks that match the selected filters" 
+                                            showColumns={{ 
+                                                status: true, 
+                                                assignedTo: false, 
+                                                teamName: true,
+                                                dueDate: true, 
+                                                actions: true 
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="card">
+                                    <div className="card-header bg-white">
+                                        <h5 className="mb-0">Team Tasks</h5>
+                                    </div>
+                                    <div className="card-body">
+                                        <TaskTable 
+                                            tasks={teamTasks} 
+                                            emptyMessage="Your teams have no tasks that match the selected filters" 
+                                            showColumns={{ 
+                                                status: true, 
+                                                assignedTo: true, 
+                                                teamName: true,
+                                                dueDate: true, 
+                                                actions: true 
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -99,7 +114,8 @@ const ViewTasks = ({ isAuthenticated, userTasks, teamTasks, fetchTasks, fetchTea
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
     userTasks: state.task.userTasks,
-    teamTasks: state.task.teamTasks
+    teamTasks: state.task.teamTasks,
+    loading: state.task.loading
 });
 
 export default connect(

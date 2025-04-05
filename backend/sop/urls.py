@@ -19,4 +19,4 @@ urlpatterns = [
     path('summarise-sop/', SummariseSOPView.as_view(), name='summarise_sop'),
     path('improve-sop/', ImproveSOPView.as_view(), name='improve_sop'),
     path('documents/<int:document_id>/', DocumentDeleteView.as_view(), name='document-delete'),
-]
+    ]

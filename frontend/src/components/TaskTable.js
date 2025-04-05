@@ -1,149 +1,213 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { FaEdit, FaTrash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { updateTaskStatus, deleteTask } from '../actions/task';
 import { formatDate } from '../utils/utils';
-import { getStatusIconWithTooltip, handleTaskDelete } from '../actions/task';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import Modal from 'react-bootstrap/Modal';
+import Button from 'react-bootstrap/Button';
 
-const TaskTable = ({ 
-    tasks, 
-    teams, 
-    user, 
-    handleTaskDelete, 
-    emptyMessage = "No tasks available",
-    limit = null, // Add a limit prop
-    showColumns = { status: true, description: true, assignedTo: true, team: true, dueDate: true, actions: true } // Control which columns to show
+const TaskTable = ({
+    tasks = [],
+    emptyMessage = "No tasks found",
+    showColumns = {
+        status: true,
+        assignedTo: true,
+        teamName: true,
+        dueDate: true,
+        actions: true
+    },
+    updateTaskStatus,
+    deleteTask,
+    onRowClick
 }) => {
-    const [expandedRow, setExpandedRow] = useState(null);
     const navigate = useNavigate();
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [taskToDelete, setTaskToDelete] = useState(null);
+    const [showCompleteModal, setShowCompleteModal] = useState(false);
+    const [taskToComplete, setTaskToComplete] = useState(null);
+    const [expandedDescriptions, setExpandedDescriptions] = useState({});
 
-    // If limit is set, only show that many tasks
-    const displayTasks = limit ? tasks.slice(0, limit) : tasks;
-
-    const toggleRowExpand = (taskId) => {
-        setExpandedRow(expandedRow === taskId ? null : taskId);
-    };
-    
-    // Check if user has permission to edit/delete a task
-    const canModifyTask = (task) => {
-        if (!user) return false;
-        
-        // User can modify if they are assigned to the task
-        const isAssignedUser = task.assigned_to === user.id;
-        
-        // User can modify if they are the team owner
-        let isTeamOwner = false;
-        
-        if (task.team && teams && teams.length > 0) {
-            const taskTeam = teams.find(team => Number(team.id) === Number(task.team));
-            
-            if (taskTeam && taskTeam.members) {
-                const userMembership = taskTeam.members.find(membership => 
-                    Number(membership.user) === Number(user.id)
-                );
-                
-                if (userMembership) {
-                    isTeamOwner = userMembership.role === 'owner';
-                }
-            }
-        }
-        
-        return isAssignedUser || isTeamOwner;
-    };
-    
-    // Handle edit click with permission check
-    const handleEditClick = (task) => {
-        if (canModifyTask(task)) {
+    const handleRowClick = (task) => {
+        if (onRowClick) {
+            onRowClick(task);
+        } else {
             navigate(`/edit-task/${task.id}`);
-        } else {
-            alert("You don't have permission to edit this task. Only assigned users or team owners can edit tasks.");
-        }
-    };
-    
-    // Handle delete click with permission check
-    const handleDeleteClick = (task) => {
-        if (canModifyTask(task)) {
-            handleTaskDelete(task.id);
-        } else {
-            alert("You don't have permission to delete this task. Only assigned users or team owners can delete tasks.");
         }
     };
 
-    // Function to render actions column
-    const renderActionButtons = (task) => {
-        const canModify = canModifyTask(task);
-        const iconStyle = canModify 
-            ? { opacity: 1, cursor: 'pointer' } 
-            : { opacity: 0.4, cursor: 'not-allowed' };
-            
-        return (
-            <td>
-                <FaEdit 
-                    className="action-icon edit-icon" 
-                    onClick={() => handleEditClick(task)} 
-                    style={iconStyle} 
-                    title={canModify ? "Edit task" : "You don't have permission to edit this task"}
-                />
-                <FaTrash 
-                    className="action-icon delete-icon" 
-                    onClick={() => handleDeleteClick(task)} 
-                    style={iconStyle}
-                    title={canModify ? "Delete task" : "You don't have permission to delete this task"}
-                />
-            </td>
-        );
+    const handleEdit = (e, taskId) => {
+        e.stopPropagation();
+        navigate(`/edit-task/${taskId}`);
     };
 
-    if (!tasks || tasks.length === 0) {
-        return <p>{emptyMessage}</p>;
+    const handleDelete = (e, task) => {
+        e.stopPropagation();
+        setTaskToDelete(task);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        if (taskToDelete) {
+            await deleteTask(taskToDelete.id);
+            setShowDeleteModal(false);
+        }
+    };
+
+    const handleComplete = (e, task) => {
+        e.stopPropagation();
+        setTaskToComplete(task);
+        setShowCompleteModal(true);
+    };
+
+    const confirmComplete = async () => {
+        if (taskToComplete) {
+            await updateTaskStatus(taskToComplete.id, 'complete');
+            setShowCompleteModal(false);
+        }
+    };
+
+    const isPastDue = (due) => {
+        if (!due) return false;
+        const now = new Date();
+        const dueDate = new Date(due);
+        return dueDate.setHours(0, 0, 0, 0) < now.setHours(0, 0, 0, 0);
+    };
+
+    const toggleDescription = (e, taskId) => {
+        e.stopPropagation();
+        setExpandedDescriptions(prev => ({
+            ...prev,
+            [taskId]: !prev[taskId]
+        }));
+    };
+
+    // Function to truncate text
+    const truncateText = (text, maxLength = 35) => {
+        if (!text || text.length <= maxLength) return text;
+        return text.slice(0, maxLength) + '...';
+    };
+
+    if (!tasks.length) {
+        return <div className="alert alert-info text-center">{emptyMessage}</div>;
     }
 
     return (
-        <div className="table-responsive">
-            <table className="table">
-                <thead>
-                    <tr>
-                        {showColumns.status && <th>Status</th>}
-                        {showColumns.description && <th>Description</th>}
-                        {showColumns.assignedTo && <th>Assigned To</th>}
-                        {showColumns.team && <th>Team</th>}
-                        {showColumns.dueDate && <th>Due Date</th>}
-                        {showColumns.actions && <th>Actions</th>}
-                    </tr>
-                </thead>
-                <tbody>
-                    {displayTasks.map(task => (
-                        <React.Fragment key={task.id}>
-                            <tr>
-                                {showColumns.status && <td className="status-width">{getStatusIconWithTooltip(task.status)}</td>}
-                                {showColumns.description && <td className="truncate-description" onClick={() => toggleRowExpand(task.id)}>
-                                    <span>{task.description}</span>
-                                </td>}
-                                {showColumns.assignedTo && <td>{task.assigned_to_name}</td>}
-                                {showColumns.team && <td>{task.team_name}</td>}
-                                {showColumns.dueDate && <td>{formatDate(task.due_date)}</td>}
-                                {showColumns.actions && renderActionButtons(task)}
-                            </tr>
-                            {expandedRow === task.id && (
-                                <tr className="expanded-row">
-                                    <td colSpan="6">
-                                        <div className="expanded-content">
-                                            <strong>Full Description:</strong> {task.description}
+        <>
+            <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            {showColumns.status && <th>Status</th>}
+                            {showColumns.assignedTo && <th>Assigned To</th>}
+                            {showColumns.teamName && <th>Team</th>}
+                            {showColumns.dueDate && <th>Due Date</th>}
+                            {showColumns.actions && <th className="text-center action-column">Actions</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {tasks.map(task => (
+                            <React.Fragment key={task.id}>
+                                <tr
+                                    className={isPastDue(task.due_date) && task.status !== 'complete' ? 'table-danger' : ''}
+                                    onClick={() => handleRowClick(task)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <td>
+                                        <div className="d-flex align-items-center">
+                                            <div className="me-2 flex-grow-1">
+                                                {truncateText(task.description)}
+                                                {isPastDue(task.due_date) && task.status !== 'complete' && (
+                                                    <FaExclamationTriangle className="text-danger ms-2" title="Past due" />
+                                                )}
+                                            </div>
+                                            {task.description && task.description.length > 35 && (
+                                                <button 
+                                                    className="expand-button" 
+                                                    onClick={(e) => toggleDescription(e, task.id)}
+                                                    title={expandedDescriptions[task.id] ? "Collapse description" : "Expand description"}
+                                                >
+                                                    {expandedDescriptions[task.id] ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
+                                    {showColumns.status && <td><span className={`badge bg-${task.status === 'complete' ? 'success' : task.status === 'in_progress' ? 'primary' : 'secondary'}`}>{task.status.replace('_', ' ')}</span></td>}
+                                    {showColumns.assignedTo && <td>{task.assigned_to_name || 'Unassigned'}</td>}
+                                    {showColumns.teamName && <td>{task.team_name || '—'}</td>}
+                                    {showColumns.dueDate && <td>{task.due_date ? formatDate(task.due_date) : '—'}</td>}
+                                    {showColumns.actions && (
+                                        <td>
+                                            <div className="d-flex justify-content-center gap-2">
+                                                <button 
+                                                    className="btn btn-sm task-icon-button"
+                                                    onClick={(e) => handleEdit(e, task.id)} 
+                                                    title="Edit"
+                                                >
+                                                    <FaEdit size={14} className="text-primary" />
+                                                </button>
+                                                
+                                                {task.status !== 'complete' && (
+                                                    <button 
+                                                        className="btn btn-sm task-icon-button"
+                                                        onClick={(e) => handleComplete(e, task)} 
+                                                        title="Mark Complete"
+                                                    >
+                                                        <FaCheck size={14} className="text-success" />
+                                                    </button>
+                                                )}
+                                                
+                                                <button 
+                                                    className="btn btn-sm task-icon-button"
+                                                    onClick={(e) => handleDelete(e, task)} 
+                                                    title="Delete"
+                                                >
+                                                    <FaTrash size={14} className="text-danger" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
                                 </tr>
-                            )}
-                        </React.Fragment>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                                {expandedDescriptions[task.id] && (
+                                    <tr 
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="expanded-description-row"
+                                    >
+                                        <td colSpan={Object.values(showColumns).filter(Boolean).length + 1}>
+                                            <div className="compact-description">
+                                                {task.description}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Delete Modal */}
+            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+                <Modal.Header closeButton><Modal.Title>Delete Task</Modal.Title></Modal.Header>
+                <Modal.Body>Are you sure you want to delete this task?</Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+                    <Button variant="danger" onClick={confirmDelete}>Delete</Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Complete Modal */}
+            <Modal show={showCompleteModal} onHide={() => setShowCompleteModal(false)} centered>
+                <Modal.Header closeButton><Modal.Title>Mark Task Complete</Modal.Title></Modal.Header>
+                <Modal.Body>Are you sure you want to mark this task as complete?</Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowCompleteModal(false)}>Cancel</Button>
+                    <Button variant="success" onClick={confirmComplete}>Confirm</Button>
+                </Modal.Footer>
+            </Modal>
+        </>
     );
 };
 
-const mapStateToProps = (state) => ({
-    user: state.auth.user,
-    teams: state.team ? state.team.teams : []
-});
-
-export default connect(mapStateToProps, { getStatusIconWithTooltip, handleTaskDelete })(TaskTable);
+export default connect(null, { updateTaskStatus, deleteTask })(TaskTable);

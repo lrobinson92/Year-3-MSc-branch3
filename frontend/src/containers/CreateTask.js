@@ -80,7 +80,7 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
     const onSubmit = async (e) => {
         e.preventDefault();
         try {
-            await createTask(description, assigned_to, team, due_date, status);
+            await createTask({ description, assigned_to, team, due_date, status });
             alert("Task created successfully!");
             navigate('/view/tasks');
         } catch (error) {

@@ -1,9 +1,12 @@
 import React from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { FaQuestion } from 'react-icons/fa';
+import { FaQuestion, FaBug } from 'react-icons/fa';
 
 const Sidebar = ( { user } ) => {
+
+    const location = useLocation();
+
     const getUserInitial = (name) => {
         return name ? name.charAt(0).toUpperCase() : '';
     };
@@ -71,6 +74,16 @@ const Sidebar = ( { user } ) => {
                             </div>
                         </Link>
                     </li>
+                    {process.env.NODE_ENV === 'development' && (
+                        <li className="nav-item">
+                            <Link
+                                to="/api-debug"
+                                className={`nav-link ${location.pathname === '/api-debug' ? 'active' : ''}`}
+                            >
+                                <FaBug className="sidebar-icon" /> API Debugger
+                            </Link>
+                        </li>
+                    )}
                 </ul>
             </div>
         </nav>

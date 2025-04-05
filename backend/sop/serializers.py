@@ -48,16 +48,58 @@ class TeamSerializer(serializers.ModelSerializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
+    """Task serializer with additional fields and validation"""
+    
+    # Add read-only fields for displaying names
     assigned_to_name = serializers.SerializerMethodField()
-    team_name = serializers.ReadOnlyField(source='team.name')
-
+    team_name = serializers.SerializerMethodField()
+    
     class Meta:
         model = Task
-        fields = ['id', 'description', 'assigned_to', 'assigned_to_name', 'team', 'team_name', 'due_date', 'status']
-        read_only_fields = ['id']
-
+        fields = [
+            'id', 'description', 'assigned_to', 'assigned_to_name',
+            'team', 'team_name', 'due_date', 'status',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'assigned_to_name', 'team_name']
+    
     def get_assigned_to_name(self, obj):
-        return obj.assigned_to.name if obj.assigned_to else 'Unassigned'
+        """Return the name of the assigned user or 'Unassigned'"""
+        if obj.assigned_to:
+            return obj.assigned_to.name
+        return "Unassigned"
+    
+    def get_team_name(self, obj):
+        """Return the team name if task belongs to a team"""
+        if obj.team:
+            return obj.team.name
+        return None
+    
+    def validate(self, data):
+        """Additional validation for task data"""
+        # Ensure due date is provided
+        if 'due_date' not in data:
+            raise serializers.ValidationError({"due_date": "Due date is required"})
+        
+        # Ensure valid status
+        status = data.get('status')
+        valid_statuses = [choice[0] for choice in Task.Status.choices]
+        if status and status not in valid_statuses:
+            raise serializers.ValidationError({"status": f"Status must be one of: {', '.join(valid_statuses)}"})
+        
+        # Check team membership for assignment
+        team = data.get('team')
+        assigned_to = data.get('assigned_to')
+        
+        if team and assigned_to:
+            # Ensure user is a member of the team they're being assigned a task for
+            team_member_exists = team.members.filter(id=assigned_to.id).exists()
+            if not team_member_exists:
+                raise serializers.ValidationError(
+                    {"assigned_to": "This user is not a member of the specified team"}
+                )
+        
+        return data
     
 
 class DocumentSerializer(serializers.ModelSerializer):

@@ -650,3 +650,85 @@ ul.member-list {
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
+/* Task table action column width */
+.action-column {
+    width: 120px;
+}
+
+/* Task table expanded description row */
+.expanded-description-row {
+    background-color: #f8f9fa;
+}
+
+.expanded-description-row:hover {
+    background-color: #f8f9fa;
+}
+
+/* Task description in expanded row */
+.compact-description {
+    max-height: 60px;
+    overflow-y: auto;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: #495057;
+    white-space: pre-line;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    border: 1px solid #dee2e6;
+}
+
+/* Task expand/collapse button */
+.expand-button {
+    background: transparent;
+    border: none;
+    color: #495057;
+    padding: 0;
+    margin-left: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.expand-button:hover {
+    color: #212529;
+}
+
+.expand-button:focus {
+    outline: none;
+}
+
+/* Task action buttons */
+.task-icon-button {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #dee2e6;
+}
+
+.task-icon-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Task icon colors */
+.task-icon-button .text-primary {
+    color: #0d6efd;
+}
+
+.task-icon-button .text-success {
+    color: #28a745;
+}
+
+.task-icon-button .text-danger {
+    color: #dc3545;
+}
+
+/* Flex utility for description container */
+.flex-grow-1 {
+    flex-grow: 1;
+}
+
