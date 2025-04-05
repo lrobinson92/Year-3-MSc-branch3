@@ -40,11 +40,24 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                 try {
                     const usersRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/${team}/users-in-same-team/`, { withCredentials: true });
                     console.log('Fetched users:', usersRes.data); // Debugging log
-                    setFilteredUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+                    
+                    if (Array.isArray(usersRes.data)) {
+                        const isOwner = usersRes.data.some(member => member.user === user.id && member.role === 'owner');
+                        
+                        const visibleUsers = isOwner
+                            ? usersRes.data // show all if owner
+                            : usersRes.data.filter(member => member.user === user.id); // show only self otherwise
+
+                        setFilteredUsers(visibleUsers);
+                    } else {
+                        setFilteredUsers([]);
+                    }
                 } catch (err) {
                     console.error('Failed to fetch users:', err);
+                    setFilteredUsers([]);
                 }
             } else {
+                // For personal tasks, only show the current user
                 setFilteredUsers(user ? [user] : []);
             }
         };
