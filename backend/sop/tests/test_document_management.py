@@ -162,3 +162,151 @@ class DocumentManagementTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertTrue(Document.objects.filter(id=self.team_doc.id).exists())
 
+    @patch('sop.views.OpenAI')
+    @patch('sop.views.GoogleDrive')
+    @patch('sop.views.GoogleAuth')
+    def test_generate_sop(self, mock_google_auth, mock_google_drive, mock_openai):
+        # Create a dummy OpenAI instance with a chat.completions.create method
+        dummy_response = MagicMock()
+        dummy_response.choices = [
+            MagicMock(message=MagicMock(content='<h1>Generated SOP</h1><p>This is AI-generated content.</p>'))
+        ]
+        dummy_openai_instance = MagicMock()
+        dummy_openai_instance.chat.completions.create.return_value = dummy_response
+        mock_openai.return_value = dummy_openai_instance
+        
+        # Set up Google Drive mock for document creation
+        mock_drive_instance = MagicMock()
+        mock_google_drive.return_value = mock_drive_instance
+        mock_file = MagicMock()
+        mock_file.__getitem__.return_value = "new_file_id"
+        mock_file.get.return_value = "https://docs.google.com/document/d/new_file_id/edit"
+        mock_drive_instance.CreateFile.return_value = mock_file
+        
+        # Authenticate and set Google Drive credentials in session
+        self.client.force_authenticate(user=self.owner)
+        session = self.client.session
+        session['google_drive_credentials'] = json.dumps({
+            'access_token': 'test-token',
+            'client_id': 'dummy-client',
+            'client_secret': 'dummy-secret',
+            'refresh_token': 'dummy-refresh',
+            'token_expiry': '9999-12-31T23:59:59Z',
+            'token_uri': 'https://oauth2.googleapis.com/token',
+            'user_agent': None,
+            'revoke_uri': 'https://oauth2.googleapis.com/revoke',
+            'invalid': False
+        })
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+        
+        # Test data
+        generate_data = {
+            'prompt': 'Create an SOP for handling customer complaints',
+            'title': 'Customer Complaints Handling SOP',
+            'team_id': str(self.team.id)
+        }
+        url = reverse('generate_sop')
+        response = self.client.post(url, generate_data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        dummy_openai_instance.chat.completions.create.assert_called_once()
+        # The view returns the SOP under the key 'sop'
+        self.assertIn('<h1>Generated SOP</h1>', response.data.get('sop', ''))
+
+
+    @patch('sop.views.OpenAI')
+    @patch('sop.views.GoogleDrive')
+    @patch('sop.views.GoogleAuth')
+    def test_summarise_sop(self, mock_google_auth, mock_google_drive, mock_openai):
+        # Create a dummy OpenAI instance
+        dummy_response = MagicMock()
+        dummy_response.choices = [
+            MagicMock(message=MagicMock(content='This is a summarized version of the document.'))
+        ]
+        dummy_openai_instance = MagicMock()
+        dummy_openai_instance.chat.completions.create.return_value = dummy_response
+        mock_openai.return_value = dummy_openai_instance
+        
+        # Mock Google Drive file content retrieval
+        mock_drive_instance = MagicMock()
+        mock_google_drive.return_value = mock_drive_instance
+        mock_file = MagicMock()
+        mock_file.GetContentString.return_value = '<p>Original document content that is much longer and needs summarizing.</p>'
+        mock_drive_instance.CreateFile.return_value = mock_file
+        
+        # Authenticate and set Google Drive credentials
+        self.client.force_authenticate(user=self.owner)
+        session = self.client.session
+        session['google_drive_credentials'] = json.dumps({
+            'access_token': 'test-token',
+            'client_id': 'dummy-client',
+            'client_secret': 'dummy-secret',
+            'refresh_token': 'dummy-refresh',
+            'token_expiry': '9999-12-31T23:59:59Z',
+            'token_uri': 'https://oauth2.googleapis.com/token',
+            'user_agent': None,
+            'revoke_uri': 'https://oauth2.googleapis.com/revoke',
+            'invalid': False
+        })
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+        
+        # Fix: Convert ID to string to ensure proper handling
+        # Send proper payload with 'content'
+        url = reverse('summarise_sop')
+        response = self.client.post(url, {'content': 'Original document content that needs summarizing.'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        dummy_openai_instance.chat.completions.create.assert_called_once()
+        self.assertEqual(response.data['summary'], 'This is a summarized version of the document.')
+
+
+    @patch('sop.views.OpenAI')
+    @patch('sop.views.GoogleDrive')
+    @patch('sop.views.GoogleAuth')
+    def test_improve_sop(self, mock_google_auth, mock_google_drive, mock_openai):
+        # Create a dummy OpenAI instance
+        dummy_response = MagicMock()
+        dummy_response.choices = [
+            MagicMock(message=MagicMock(content='<h1>Improved Document</h1><p>This is the improved version with better formatting and clarity.</p>'))
+        ]
+        dummy_openai_instance = MagicMock()
+        dummy_openai_instance.chat.completions.create.return_value = dummy_response
+        mock_openai.return_value = dummy_openai_instance
+
+        
+        # Mock Google Drive file content retrieval
+        mock_drive_instance = MagicMock()
+        mock_google_drive.return_value = mock_drive_instance
+        mock_file = MagicMock()
+        mock_file.GetContentString.return_value = '<p>Original document content that needs improvement.</p>'
+        # Setup for the file that will be created for the improved version
+        mock_file.__getitem__.return_value = "improved_file_id"
+        mock_file.get.return_value = "https://docs.google.com/document/d/improved_file_id/edit"
+        mock_drive_instance.CreateFile.return_value = mock_file
+        
+        # Authenticate and set Google Drive credentials
+        self.client.force_authenticate(user=self.owner)
+        session = self.client.session
+        session['google_drive_credentials'] = json.dumps({
+            'access_token': 'test-token',
+            'client_id': 'dummy-client',
+            'client_secret': 'dummy-secret',
+            'refresh_token': 'dummy-refresh',
+            'token_expiry': '9999-12-31T23:59:59Z',
+            'token_uri': 'https://oauth2.googleapis.com/token',
+            'user_agent': None,
+            'revoke_uri': 'https://oauth2.googleapis.com/revoke',
+            'invalid': False
+        })
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+        
+        # Fix: Send the correct payload format
+        url = reverse('improve_sop')
+        response = self.client.post(url, {'content': 'Original document content that needs improvement.'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        dummy_openai_instance.chat.completions.create.assert_called_once()
+        self.assertIn('<h1>Improved Document</h1>', response.data.get('improved', ''))
