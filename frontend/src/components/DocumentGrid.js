@@ -72,7 +72,7 @@ const DocumentGrid = ({
     <div>
       <div className="row">
         {displayDocs.map(doc => (
-          <div className="col-md-2" key={doc.id}>
+          <div className="col-md-2 mb-3" key={doc.id}>
             <div 
               className={`card ${cardClass}`} 
               style={{ 

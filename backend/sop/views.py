@@ -12,8 +12,8 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from oauth2client.client import OAuth2Credentials
 from openai import OpenAI
-from rest_framework import status, generics, viewsets
-from rest_framework.decorators import action
+from rest_framework import status, generics, viewsets, permissions
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -717,6 +717,31 @@ class GoogleDriveFileContentView(APIView):
         document = get_object_or_404(Document, id=document_id)
         file_id = document.google_drive_file_id
 
+        # Check permissions for team documents
+        if document.team:
+            try:
+                # Verify team membership (all members including admins can view)
+                if not TeamMembership.objects.filter(
+                    team=document.team, 
+                    user=request.user
+                ).exists():
+                    return Response(
+                        {"error": "You don't have permission to view this document."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            except Exception as e:
+                logger.error("Permission check error: %s", e)
+                return Response(
+                    {"error": "Error checking permissions."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        # For personal documents, only the owner can view
+        elif document.owner != request.user:
+            return Response(
+                {"error": "You don't have permission to view this document."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         if not file_id:
             return Response({"error": "Document does not have an associated Google Drive file ID."}, status=400)
 
@@ -777,74 +802,89 @@ class DocumentDeleteView(APIView):
     permission_classes = [IsAuthenticated]
     
     def delete(self, request, document_id):
-        try:
-            # Get the document
-            document = get_object_or_404(Document, id=document_id)
-            
-            # Check if user has permission to delete
-            if request.user != document.owner:
-                # Check if user is team owner
-                if document.team:
-                    team_member = TeamMember.objects.filter(
-                        team=document.team,
-                        user=request.user,
-                        role='owner'
-                    ).first()
-                    
-                    if not team_member:
-                        return Response(
-                            {"error": "You don't have permission to delete this document."},
-                            status=status.HTTP_403_FORBIDDEN
-                        )
-                else:
-                    # Not a team document and user is not the owner
+        document = get_object_or_404(Document, id=document_id)
+        
+        # Check permissions
+        if document.team:
+            try:
+                # Check if user is a member of this team
+                membership = TeamMembership.objects.get(team=document.team, user=request.user)
+                
+                # Only team owners or the document creator can delete
+                if membership.role != 'owner' and document.owner != request.user:
                     return Response(
-                        {"error": "You don't have permission to delete this document."},
+                        {'error': 'Only team owners or the document creator can delete team documents.'},
                         status=status.HTTP_403_FORBIDDEN
                     )
-            
-            # Get Google Drive credentials
-            creds_json = request.session.get('google_drive_credentials')
-            if not creds_json:
-                return Response(
-                    {"error": "Not authenticated with Google Drive."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-            
-            try:
-                credentials = OAuth2Credentials.from_json(creds_json)
-            except Exception as e:
-                logger.error("Failed to load Google Drive credentials: %s", e)
-                return Response(
-                    {"error": "Invalid Google Drive credentials."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Delete from Google Drive if file ID exists
-            if document.google_drive_file_id:
-                try:
-                    # Initialize PyDrive
-                    gauth = GoogleAuth()
-                    gauth.credentials = credentials
-                    drive = GoogleDrive(gauth)
                     
-                    # Get the file
-                    gfile = drive.CreateFile({'id': document.google_drive_file_id})
-                    
-                    # Delete the file
-                    gfile.Delete()
-                except Exception as e:
-                    logger.error("Error deleting file from Google Drive: %s", e)
-                    # Continue with database deletion even if Drive deletion fails
+            except TeamMembership.DoesNotExist:
+                return Response(
+                    {'error': 'You are not a member of this team.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        # For personal documents, only the owner can delete
+        elif document.owner != request.user:
+            return Response(
+                {'error': 'You do not have permission to delete this document.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # If we get here, user has permission to delete the document
+        try:
+            # Delete from Google Drive
+            gauth = GoogleAuth()
+            drive = GoogleDrive(gauth)
+            file1 = drive.CreateFile({'id': document.google_drive_file_id})
+            file1.Delete()
             
             # Delete from database
             document.delete()
             
             return Response(status=status.HTTP_204_NO_CONTENT)
-            
         except Exception as e:
-            logger.error("Error in DocumentDeleteView: %s", e)
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Update DocumentPermission class
+
+class DocumentPermission(permissions.BasePermission):
+    """Custom permission for document operations"""
+    
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+    
+    def has_object_permission(self, request, view, obj):
+        # Check if user is the document owner
+        if obj.owner == request.user:
+            return True
+            
+        # Check if document belongs to a team
+        if obj.team:
+            # Check user's role in the team
+            try:
+                membership = TeamMembership.objects.get(team=obj.team, user=request.user)
+                
+                # Admin users can only use safe methods (GET, HEAD, OPTIONS)
+                if membership.role == 'admin' and request.method in permissions.SAFE_METHODS:
+                    return True
+                
+                # Member and owner roles can use safe methods
+                if request.method in permissions.SAFE_METHODS:
+                    return True
+                    
+                # Allow editing for members and owners
+                if request.method in ['PUT', 'PATCH'] and membership.role in ['member', 'owner']:
+                    return True
+                    
+                # Allow deletion only for owners and document creator
+                if request.method == 'DELETE':
+                    if membership.role == 'owner' or obj.owner == request.user:
+                        return True
+                    
+                return False
+            except TeamMembership.DoesNotExist:
+                return False
+                
+        # If document doesn't belong to a team, only owner can access
+        return obj.owner == request.user
+
+

@@ -7,6 +7,7 @@
     "axios": "^1.7.9",
     "bootstrap": "^5.3.3",
     "cra-template": "1.2.0",
+    "date-fns": "^4.1.0",
     "diff": "^7.0.0",
     "gapi-script": "^1.2.0",
     "html-docx-js": "^0.3.1",

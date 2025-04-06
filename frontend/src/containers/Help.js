@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
 import GoogleDriveAuthCheck from '../components/GoogleDriveAuthCheck';
-import { FaFileAlt, FaUsers, FaCheckSquare, FaGoogle, FaEdit } from 'react-icons/fa';
+import { FaFileAlt, FaUsers, FaCheckSquare, FaGoogle, FaEdit, FaLock } from 'react-icons/fa';
 
 const Help = ({ isAuthenticated }) => {
   if (!isAuthenticated) {
@@ -186,6 +186,178 @@ const Help = ({ isAuthenticated }) => {
                   This feature helps ensure that important tasks are never forgotten and 
                   team members have adequate time to complete their assigned work.
                 </p>
+              </div>
+            </div>
+            
+            {/* NEW SECTION: Permissions & Access Control */}
+            <div className="mb-5">
+              <h3 className="d-flex align-items-center mb-3">
+                <FaLock className="me-2" style={{ color: '#dc3545' }} /> 
+                Permissions & Access Control
+              </h3>
+              <div className="card p-4 mb-4">
+                <h5>Team Roles & Permissions</h5>
+                <p>SOPify uses role-based access control with three distinct roles for team collaboration:</p>
+                
+                <div className="table-responsive">
+                  <table className="table table-bordered">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Role</th>
+                        <th>Description</th>
+                        <th>Permissions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Owner</strong></td>
+                        <td>Team creator or designated owner</td>
+                        <td>
+                          <ul className="mb-0 ps-3">
+                            <li>Create, edit and delete the team</li>
+                            <li>Invite new members</li>
+                            <li>Change member roles</li>
+                            <li>Remove members</li>
+                            <li>Full access to all team resources</li>
+                          </ul>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><strong>Member</strong></td>
+                        <td>Regular team participant</td>
+                        <td>
+                          <ul className="mb-0 ps-3">
+                            <li>View team information</li>
+                            <li>Create content within the team</li>
+                            <li>Edit team content</li>
+                            <li>Cannot delete content created by others</li>
+                          </ul>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><strong>Admin</strong></td>
+                        <td>Observer role with limited privileges</td>
+                        <td>
+                          <ul className="mb-0 ps-3">
+                            <li>View team information and resources</li>
+                            <li>Can edit tasks assigned directly to them</li>
+                            <li>Otherwise has read-only access</li>
+                            <li>Cannot create or delete team content</li>
+                          </ul>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="alert alert-warning mt-4">
+                  <strong>Important:</strong> The permissions below apply only to team documents and tasks. 
+                  Personal items (not assigned to any team) are fully controlled by their creator, 
+                  regardless of role, and are not visible to other users.
+                </div>
+                
+                <h5 className="mt-4">Team Document Permissions</h5>
+                <p>Access to team documents is controlled by your role in that team:</p>
+                
+                <div className="table-responsive">
+                  <table className="table table-bordered">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Action</th>
+                        <th>Owner</th>
+                        <th>Member</th>
+                        <th>Admin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>View team documents</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                      </tr>
+                      <tr>
+                        <td>Create new team documents</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-danger">✗</td>
+                      </tr>
+                      <tr>
+                        <td>Edit team documents</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-danger">✗</td>
+                      </tr>
+                      <tr>
+                        <td>Delete team documents</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-danger">✗</td>
+                        <td className="text-center text-danger">✗</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <h5 className="mt-4">Team Task Permissions</h5>
+                <p>Team task management follows similar permission structure:</p>
+                
+                <div className="table-responsive">
+                  <table className="table table-bordered">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Action</th>
+                        <th>Owner</th>
+                        <th>Member</th>
+                        <th>Admin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>View team tasks</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                      </tr>
+                      <tr>
+                        <td>Create team tasks assigned to self</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-danger">✗</td>
+                      </tr>
+                      <tr>
+                        <td>Create team tasks assigned to others</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-danger">✗</td>
+                        <td className="text-center text-danger">✗</td>
+                      </tr>
+                      <tr>
+                        <td>Edit tasks assigned to self</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                      </tr>
+                      <tr>
+                        <td>Edit tasks assigned to others</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-danger">✗</td>
+                        <td className="text-center text-danger">✗</td>
+                      </tr>
+                      <tr>
+                        <td>Mark tasks assigned to self as complete</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-success">✓</td>
+                      </tr>
+                      <tr>
+                        <td>Delete any team task</td>
+                        <td className="text-center text-success">✓</td>
+                        <td className="text-center text-danger">✗</td>
+                        <td className="text-center text-danger">✗</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
               </div>
             </div>
             

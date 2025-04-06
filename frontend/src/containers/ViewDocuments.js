@@ -123,7 +123,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     
     try {
       await axiosInstance.delete(
-        `${process.env.REACT_APP_API_URL}/api/documents/${documentToDelete.id}/`,
+        `${process.env.REACT_APP_API_URL}/api/documents/${documentToDelete.id}/delete/`,
         { withCredentials: true }
       );
       
