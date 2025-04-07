@@ -377,10 +377,22 @@ class GoogleDriveUploadView(APIView):
             if not file_obj and not text_content:
                 return Response({"error": "You must provide either a file or text content."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Retrieve the team (if not provided, you could default to None for a personal document)
+            # Check if team exists if team_id is provided
             team = None
             if team_id:
-                team = get_object_or_404(Team, id=team_id)
+                try:
+                    team = Team.objects.get(id=team_id)
+                    # Verify user is a member of the team
+                    if not TeamMembership.objects.filter(team=team, user=request.user).exists():
+                        return Response(
+                            {"error": "You are not a member of this team"}, 
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                except Team.DoesNotExist:
+                    return Response(
+                        {"error": f"Team with ID {team_id} not found"}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
             # Prepare Google Auth with PyDrive2
             gauth = GoogleAuth()
