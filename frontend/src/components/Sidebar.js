@@ -74,16 +74,6 @@ const Sidebar = ( { user } ) => {
                             </div>
                         </Link>
                     </li>
-                    {process.env.NODE_ENV === 'development' && (
-                        <li className="nav-item">
-                            <Link
-                                to="/api-debug"
-                                className={`nav-link ${location.pathname === '/api-debug' ? 'active' : ''}`}
-                            >
-                                <FaBug className="sidebar-icon" /> API Debugger
-                            </Link>
-                        </li>
-                    )}
                 </ul>
             </div>
         </nav>
