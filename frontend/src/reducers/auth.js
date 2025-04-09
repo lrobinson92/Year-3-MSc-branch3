@@ -72,15 +72,38 @@ const initialState = {
                 user: null
             };
         case LOGIN_FAIL:
-        case SIGNUP_FAIL:
-        case LOGOUT:
+            localStorage.removeItem('access');
+            localStorage.removeItem('refresh'); 
             return {
                 ...state,
                 access: null,
                 refresh: null,
                 isAuthenticated: false,
                 user: null,
-                error: payload
+                error: payload // Keep the error message from the action payload
+            };
+        case SIGNUP_FAIL:
+            localStorage.removeItem('access');
+            localStorage.removeItem('refresh'); 
+            return {
+                ...state,
+                access: null,
+                refresh: null,
+                isAuthenticated: false,
+                user: null,
+                error: payload // Keep the error message
+            };
+        case LOGOUT:
+            localStorage.removeItem('access');
+            localStorage.removeItem('refresh'); 
+            return {
+                ...state,
+                access: null,
+                refresh: null,
+                isAuthenticated: false,
+                user: null,
+                firstLogin: false, // Reset this flag on logout
+                error: null // This should remain null for logout
             };
         case PASSWORD_RESET_SUCCESS:
         case PASSWORD_RESET_FAIL:

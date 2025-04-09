@@ -77,18 +77,14 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
     const onChange = (e) => {
         const { name, value } = e.target;
         
-        // If team field is changed
-        if (name === 'team') {
-            setFormData({ 
-                ...formData, 
-                [name]: value,
-                // Reset assigned_to when team changes
-                assigned_to: value ? '' : (user ? user.id : '')
-            });
-        } else {
-            setFormData({ ...formData, [name]: value });
-        }
-    };
+        setFormData((prevState) => ({
+          ...prevState,
+          [name]: value,
+          ...(name === 'team'
+            ? { assigned_to: value ? '' : (user ? user.id : '') }
+            : {})
+        }));
+      };
 
     const onSubmit = async (e) => {
         e.preventDefault();
@@ -121,8 +117,9 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                 <h1 className="text-center mb-4">Create Task</h1>
                 <form onSubmit={onSubmit}>
                     <div className="form-group mb-3">
-                        <label>Description</label>
+                        <label htmlFor="description">Description</label>
                         <textarea
+                            id="description"
                             className="form-control"
                             placeholder="Description"
                             name="description"
@@ -132,8 +129,9 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                         />
                     </div>
                     <div className="form-group mb-3">
-                        <label>Team (Optional)</label>
+                        <label htmlFor="team">Team (Optional)</label>
                         <select
+                            id="team"
                             className="form-control"
                             name="team"
                             value={team}
@@ -146,8 +144,9 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                         </select>
                     </div>
                     <div className="form-group mb-3">
-                        <label>Assigned To</label>
+                        <label htmlFor="assigned_to">Assigned To</label>
                         <select
+                            id="assigned_to"
                             className="form-control"
                             name="assigned_to"
                             value={assigned_to}
@@ -159,15 +158,18 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                                 <option value={user.id}>{user.name}</option>
                             )}
                             {filteredUsers.map(user => (
+                            user && user.user && user.user_name ? (
                                 <option key={user.user} value={user.user}>
-                                    {user.user_name}
+                                {user.user_name}
                                 </option>
+                            ) : null
                             ))}
                         </select>
                     </div>
                     <div className="form-group mb-3">
-                        <label>Due Date</label>
+                        <label htmlFor="due_date">Due Date</label>
                         <input
+                            id="due_date"
                             type="date"
                             className="form-control"
                             name="due_date"
@@ -177,8 +179,9 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                         />
                     </div>
                     <div className="form-group mb-3">
-                        <label>Status</label>
+                        <label htmlFor="status">Status</label>
                         <select
+                            id="status"
                             className="form-control"
                             name="status"
                             value={status}

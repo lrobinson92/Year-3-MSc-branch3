@@ -1,31 +1,22 @@
 // jest-dom adds custom jest matchers for asserting on DOM nodes.
 import '@testing-library/jest-dom/extend-expect';
+import React from 'react';
 import { render } from '@testing-library/react';
+import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
+import rootReducer from './reducers';
 
-// Create a simplified mock store creator that doesn't need middleware
-const createMockStore = (initialState = {}) => {
-  const store = {
-    getState: jest.fn(() => initialState),
-    dispatch: jest.fn(),
-    subscribe: jest.fn(),
-    replaceReducer: jest.fn(),
-    getActions: jest.fn(() => []),
-    clearActions: jest.fn()
-  };
-  return store;
-};
-
-// Helper function to render components with Redux
 export const renderWithRedux = (
   ui,
-  { 
-    initialState = {}, 
+  {
+    initialState = {},
+    store = configureStore({
+      reducer: rootReducer,
+      preloadedState: initialState
+    }),
     ...renderOptions
   } = {}
 ) => {
-  const store = createMockStore(initialState);
-  
   const Wrapper = ({ children }) => (
     <Provider store={store}>{children}</Provider>
   );

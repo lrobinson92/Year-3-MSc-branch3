@@ -18,7 +18,8 @@ module.exports = {
   // Mock CSS/SCSS/image files
   moduleNameMapper: {
     "\\.(css|less|scss|sass)$": "identity-obj-proxy",
-    "\\.(jpg|jpeg|png|gif|webp|svg)$": "<rootDir>/__mocks__/fileMock.js"
+    "\\.(jpg|jpeg|png|gif|webp|svg)$": "<rootDir>/__mocks__/fileMock.js",
+    "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js"
   },
   
   // Test match patterns

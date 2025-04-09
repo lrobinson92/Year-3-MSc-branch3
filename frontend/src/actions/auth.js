@@ -200,21 +200,35 @@ export const reset_password_confirm = (uid, token, new_password, re_new_password
 };
 
 export const logout = () => async dispatch => {
-    
-    const config = {
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        withCredentials: true,
-    };
-    
     try {
+        // Keep the API call if your backend invalidates sessions or clears cookies
+        const config = {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            withCredentials: true,
+        };
+        
         await axiosInstance.post(`${process.env.REACT_APP_API_URL}/auth/logout/`, {}, config);
-
+        
+        // Add explicit localStorage cleanup - this is missing from your current code
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        
+        // Dispatch action to update Redux state
         dispatch({
             type: LOGOUT
         });
     } catch (err) {
         console.error("Logout failed", err);
+        
+        // Even if API call fails, still clear local storage and update state
+        // This ensures the user is logged out locally even if server request fails
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        
+        dispatch({
+            type: LOGOUT
+        });
     }
 };
