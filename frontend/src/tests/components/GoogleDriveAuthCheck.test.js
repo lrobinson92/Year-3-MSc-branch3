@@ -1,8 +1,8 @@
 import React from 'react';
 import { screen, fireEvent } from '@testing-library/react';
-import { renderWithRedux } from '../setupTests';
-import GoogleDriveAuthCheck from './GoogleDriveAuthCheck';
-import { googleDriveLogin } from '../actions/googledrive';
+import { renderWithRedux } from '../../setupTests';
+import GoogleDriveAuthCheck from '../../components/GoogleDriveAuthCheck';
+import { googleDriveLogin } from '../../actions/googledrive';
 
 // Mock the googleDriveLogin action
 jest.mock('../actions/googledrive', () => ({
@@ -123,7 +123,7 @@ describe('GoogleDriveAuthCheck', () => {
 
   test('connected component works with Redux store', () => {
     // Use the actual component import with Redux connection
-    const ConnectedComponent = require('./GoogleDriveAuthCheck').default;
+    const ConnectedComponent = require('../../components/GoogleDriveAuthCheck').default;
     
     renderWithRedux(
       <ConnectedComponent>
@@ -145,7 +145,7 @@ describe('GoogleDriveAuthCheck', () => {
 
   test('connected component shows auth prompt when not logged in', () => {
     // Use the actual component import with Redux connection
-    const ConnectedComponent = require('./GoogleDriveAuthCheck').default;
+    const ConnectedComponent = require('../../components/GoogleDriveAuthCheck').default;
     
     renderWithRedux(
       <ConnectedComponent>

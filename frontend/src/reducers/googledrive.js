@@ -22,11 +22,13 @@ export default function(state = initialState, action) {
                 documents: payload
             };
         case SET_DRIVE_LOGGED_IN:
+            console.log("Updating driveLoggedIn in reducer to:", payload);
             return {
                 ...state,
                 driveLoggedIn: payload
             };
         case GOOGLE_DRIVE_LOGIN_SUCCESS:
+            console.log("Updating driveLoggedIn in reducer to: true in google drive logic reducer");
             return {
                 ...state,
                 driveLoggedIn: true,

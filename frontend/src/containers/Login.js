@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { login } from '../actions/auth';
 
@@ -10,6 +10,7 @@ const Login = ({ login, isAuthenticated, error }) => {
     });
 
     const { email, password } = formData;
+    const navigate = useNavigate();
 
     const onChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -18,9 +19,25 @@ const Login = ({ login, isAuthenticated, error }) => {
         login(email, password);
     };
 
-    if (isAuthenticated) {
-        return <Navigate to='/view/dashboard' />
-    }
+
+
+    // Update the auth redirect to respect Google Drive auth:
+    useEffect(() => {
+        if (isAuthenticated) {
+            // Get the current URL search params
+            const searchParams = new URLSearchParams(window.location.search);
+            
+            // If we're coming from a Google Drive auth callback, don't redirect to dashboard
+            if (searchParams.get('drive_auth') === 'success') {
+                // Extract the intended destination if available
+                const destination = searchParams.get('destination') || '/view/documents';
+                navigate(destination + '?drive_auth=success');
+            } else {
+                // Normal login flow - redirect to dashboard
+                navigate('/view/dashboard');
+            }
+        }
+    }, [isAuthenticated, navigate]);
 
     return (
         <div className="container mt-5 entry-container">

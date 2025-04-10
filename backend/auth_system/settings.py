@@ -232,7 +232,10 @@ CORS_ALLOW_ALL_ORIGINS = True  # Change this in production!
 #CSRF_COOKIE_NAME = 'csrftoken'
 #CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 #CSRF_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_DOMAIN = "localhost"
+
 
 LOGGING = {
     "version": 1,

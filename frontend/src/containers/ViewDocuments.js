@@ -23,6 +23,10 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
 
+
+
+
+
   // Check if we should redirect to view a document after authentication
   useEffect(() => {
     if (driveLoggedIn) {
@@ -163,7 +167,8 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
             )}
           </div>
 
-          <GoogleDriveAuthCheck showPrompt={true}>
+          {/* Only prompt for Google Drive auth if not already logged in */}
+          <GoogleDriveAuthCheck showPrompt={!driveLoggedIn}>
             {loading ? (
               <div className="text-center p-5">
                 <div className="spinner-border text-primary" role="status">

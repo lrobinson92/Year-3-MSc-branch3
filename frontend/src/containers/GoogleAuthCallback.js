@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { setDriveLoggedIn } from '../actions/googledrive';
-import axiosInstance from '../utils/axiosConfig';
 
 const GoogleAuthCallback = ({ setDriveLoggedIn }) => {
   const [loading, setLoading] = useState(true);
@@ -10,52 +9,36 @@ const GoogleAuthCallback = ({ setDriveLoggedIn }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      try {
-        // Extract code from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        
-        if (!code) {
-          setError('No authorization code received');
-          setLoading(false);
-          return;
-        }
-
-        // Send code to backend
-        await axiosInstance.post(
-          `${process.env.REACT_APP_API_URL}/api/google-drive/auth-callback/`,
-          { code },
-          { withCredentials: true }
-        );
-
-        // Update Redux state
-        setDriveLoggedIn(true);
-
-        // Get stored return URL
-        let returnUrl = sessionStorage.getItem('googleDriveRedirect');
-        sessionStorage.removeItem('googleDriveRedirect');
-       
-
-        // Get pending document view if any
-        const pendingDocId = sessionStorage.getItem('pendingDocumentView');
-        if (pendingDocId) {
-          returnUrl = `/view/sop/${pendingDocId}`;
-          sessionStorage.removeItem('pendingDocumentView');
-        }
-        sessionStorage.removeItem('redirectingToGoogleDrive');
-
-        // Navigate back to original page or default to documents
-        navigate(returnUrl || '/view/documents');
-      } catch (err) {
-        console.error('Error completing Google Drive auth:', err);
-        setError('Failed to complete Google Drive authentication');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    handleCallback();
+    console.log('GoogleAuthCallback mounted - processing Google Drive authentication');
+    
+    // Check if we have drive_auth=success in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const driveAuth = urlParams.get('drive_auth');
+    
+    if (driveAuth === 'success') {
+      console.log('Google Drive auth successful, updating Redux state');
+      
+      // Update Redux state
+      setDriveLoggedIn(true);
+      
+      // Clear any remaining flags from sessionStorage
+      sessionStorage.removeItem('redirectingToGoogleDrive');
+      sessionStorage.removeItem('googleDriveRedirect');
+      
+      // Get the original destination or default to documents page
+      const destination = sessionStorage.getItem('googleDriveRedirect') || '/view/documents';
+      
+      console.log(`Redirecting to original destination: ${destination}`);
+      
+      // Short delay to ensure state updates are processed
+      setTimeout(() => {
+        navigate(destination);
+      }, 100);
+    } else {
+      console.error('No drive_auth=success parameter found in URL');
+      setError('Authentication failed or was cancelled');
+      setLoading(false);
+    }
   }, [navigate, setDriveLoggedIn]);
 
   if (loading) {
@@ -74,7 +57,17 @@ const GoogleAuthCallback = ({ setDriveLoggedIn }) => {
   if (error) {
     return (
       <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="alert alert-danger">{error}</div>
+        <div className="alert alert-danger">
+          {error}
+          <div className="mt-3">
+            <button 
+              className="btn btn-primary" 
+              onClick={() => navigate('/view/documents')}
+            >
+              Return to Documents
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

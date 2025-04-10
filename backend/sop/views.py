@@ -307,7 +307,8 @@ class GoogleDriveLoginView(View):
         gauth.GetFlow()
         gauth.flow.redirect_uri = "http://localhost:8000/api/google-drive/callback/"  # This must match the authorized redirect URI
         auth_url = gauth.flow.step1_get_authorize_url()
-        return redirect(auth_url)
+        #return redirect(auth_url)
+        return JsonResponse({ "auth_url": auth_url })
 
 class GoogleDriveCallbackView(View):
     def get(self, request, *args, **kwargs):
@@ -330,14 +331,7 @@ class GoogleDriveCallbackView(View):
         # Save the credentials (as JSON) in the session
         request.session['google_drive_credentials'] = gauth.credentials.to_json()
         
-        # Try to parse the state parameter if it exists (for redirect)
-        try:
-            # Redirect to the frontend callback page with a success indicator
-            return redirect(f"{redirect_url}?drive_auth=success")
-        except Exception as e:
-            logger.error("Error parsing redirect URL: %s", str(e))
-            # Default redirect
-            return redirect("http://localhost:3000/view/documents?drive_auth=success")
+        return redirect("http://localhost:3000/google-auth-callback?drive_auth=success")
 
 class ListDriveFilesView(View):
     def get(self, request, *args, **kwargs):
