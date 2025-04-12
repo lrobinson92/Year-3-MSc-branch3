@@ -5,7 +5,7 @@ import { connect } from 'react-redux';
 import Sidebar from '../components/Sidebar';
 import axiosInstance from '../utils/axiosConfig';
 import { FaArrowLeft } from 'react-icons/fa';
-import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
+import GoogleDriveAuthCheck from '../components/GoogleDriveAuthCheck';
 
 const ViewSOP = ({ isAuthenticated, driveLoggedIn, user }) => {
   const { id } = useParams();
@@ -18,9 +18,9 @@ const ViewSOP = ({ isAuthenticated, driveLoggedIn, user }) => {
   const [documentDetails, setDocumentDetails] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
 
-  const handleDriveLogin = () => {
-    redirectToGoogleDriveLogin(window.location.pathname);
-  };
+  //const handleDriveLogin = () => {
+  //  redirectToGoogleDriveLogin(window.location.pathname);
+  //};
 
   useEffect(() => {
     if (!driveLoggedIn) return;
@@ -72,74 +72,65 @@ const ViewSOP = ({ isAuthenticated, driveLoggedIn, user }) => {
   }, [id, driveLoggedIn, user.id]);
 
   return (
-    <div className="d-flex">
-      <Sidebar />
-      <div className="main-content">
-        <FaArrowLeft
-          className="back-arrow"
-          onClick={() => navigate(-1)}
-          style={{ cursor: 'pointer', margin: '20px 0 0 20px' }}
-          title="Go back to previous page"
-        />
+    <GoogleDriveAuthCheck showPrompt={true}>
+      <div className="d-flex">
+        <Sidebar />
+        <div className="main-content">
+          <FaArrowLeft
+            className="back-arrow"
+            onClick={() => navigate(-1)}
+            style={{ cursor: 'pointer', margin: '20px 0 0 20px' }}
+            title="Go back to previous page"
+          />
 
-        <div className="recent-items-card">
-          {!driveLoggedIn ? (
-            <div className="text-center p-5">
-              <h3>Google Drive Authentication Required</h3>
-              <p>You need to authenticate with Google Drive to view this document.</p>
-              <button
-                className="btn btn-primary mt-3"
-                onClick={handleDriveLogin}
-              >
-                Connect to Google Drive
-              </button>
-            </div>
-          ) : loading ? (
-            <div className="text-center p-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <p className="mt-3">Loading document...</p>
-            </div>
-          ) : error ? (
-            <div className="alert alert-danger">{error}</div>
-          ) : (
-            <>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h2>{title}</h2>
-                {canEdit ? (
-                  <a
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-primary"
-                  >
-                    Edit Document
-                  </a>
-                ) : (
-                  <span className="badge bg-secondary py-2 px-3">Read Only</span>
-                )}
-              </div>
-              
-              {documentDetails && documentDetails.team && !canEdit && (
-                <div className="alert alert-info mb-3">
-                  <i className="fas fa-info-circle me-2"></i>
-                  You have read-only access to this document as an admin of this team.
+          <div className="recent-items-card">
+            {loading ? (
+              <div className="text-center p-5">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
                 </div>
-              )}
-              
-              <div className="sop-detail-card">
-                <div
-                  className="document-content"
-                  dangerouslySetInnerHTML={{ __html: content }}
-                  style={{ lineHeight: '1.6', fontSize: '16px' }}
-                ></div>
+                <p className="mt-3">Loading document...</p>
               </div>
-            </>
-          )}
+            ) : error ? (
+              <div className="alert alert-danger">{error}</div>
+            ) : (
+              <>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h2>{title}</h2>
+                  {canEdit ? (
+                    <a
+                      href={fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary"
+                    >
+                      Edit Document
+                    </a>
+                  ) : (
+                    <span className="badge bg-secondary py-2 px-3">Read Only</span>
+                  )}
+                </div>
+                
+                {documentDetails && documentDetails.team && !canEdit && (
+                  <div className="alert alert-info mb-3">
+                    <i className="fas fa-info-circle me-2"></i>
+                    You have read-only access to this document as an admin of this team.
+                  </div>
+                )}
+                
+                <div className="sop-detail-card">
+                  <div
+                    className="document-content"
+                    dangerouslySetInnerHTML={{ __html: content }}
+                    style={{ lineHeight: '1.6', fontSize: '16px' }}
+                  ></div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </GoogleDriveAuthCheck>
   );
 };
 

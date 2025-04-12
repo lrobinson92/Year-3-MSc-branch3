@@ -1,25 +1,31 @@
 import React from 'react';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { renderWithRedux } from '../../setupTests';
 import GoogleDriveAuthCheck from '../../components/GoogleDriveAuthCheck';
-import { googleDriveLogin } from '../../actions/googledrive';
 
-// Mock the googleDriveLogin action
-jest.mock('../actions/googledrive', () => ({
-  googleDriveLogin: jest.fn(() => ({ type: 'GOOGLE_DRIVE_LOGIN' }))
+// Mock the redirectToGoogleDriveLogin function
+jest.mock('../../utils/driveAuthUtils', () => ({
+  redirectToGoogleDriveLogin: jest.fn()
 }));
+
+// Import the mocked function for assertions
+import { redirectToGoogleDriveLogin } from '../../utils/driveAuthUtils';
 
 describe('GoogleDriveAuthCheck', () => {
   beforeEach(() => {
     // Reset all mocks before each test
     jest.clearAllMocks();
+    sessionStorage.clear();
   });
 
-  test('renders auth prompt when not logged in', () => {
+  test('renders loading UI when not logged in', () => {
     renderWithRedux(
-      <GoogleDriveAuthCheck>
-        <div data-testid="children-content">Protected Content</div>
-      </GoogleDriveAuthCheck>,
+      <MemoryRouter>
+        <GoogleDriveAuthCheck showPrompt={true}>
+          <div data-testid="children-content">Protected Content</div>
+        </GoogleDriveAuthCheck>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -29,20 +35,22 @@ describe('GoogleDriveAuthCheck', () => {
       }
     );
 
-    // Should show the auth prompt
-    expect(screen.getByText('Google Drive Authentication Required')).toBeInTheDocument();
-    expect(screen.getByText(/To view, create or edit documents/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Connect Google Drive/i })).toBeInTheDocument();
+    // Should show the loading/connecting state
+    expect(screen.getByText('Connecting to Google Drive...')).toBeInTheDocument();
+    expect(screen.getByText(/If you are not redirected automatically/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /click here/i })).toBeInTheDocument();
     
     // Should not show the children
     expect(screen.queryByTestId('children-content')).not.toBeInTheDocument();
   });
 
-  test('does not render auth prompt when logged in', () => {
+  test('does not render loading UI when logged in', () => {
     renderWithRedux(
-      <GoogleDriveAuthCheck>
-        <div data-testid="children-content">Protected Content</div>
-      </GoogleDriveAuthCheck>,
+      <MemoryRouter>
+        <GoogleDriveAuthCheck>
+          <div data-testid="children-content">Protected Content</div>
+        </GoogleDriveAuthCheck>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -52,17 +60,21 @@ describe('GoogleDriveAuthCheck', () => {
       }
     );
 
-    // Should not show the auth prompt
-    expect(screen.queryByText('Google Drive Authentication Required')).not.toBeInTheDocument();
+    // Should not show the loading UI
+    expect(screen.queryByText('Connecting to Google Drive...')).not.toBeInTheDocument();
     
     // Should show the children
     expect(screen.getByTestId('children-content')).toBeInTheDocument();
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 
-  test('clicking the connect button calls googleDriveLogin', () => {
+  test('clicking the "click here" button triggers redirect', () => {
     renderWithRedux(
-      <GoogleDriveAuthCheck />,
+      <MemoryRouter>
+        <GoogleDriveAuthCheck showPrompt={true}>
+          <div>Test Content</div>
+        </GoogleDriveAuthCheck>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -72,20 +84,20 @@ describe('GoogleDriveAuthCheck', () => {
       }
     );
 
-    // Click the connect button
-    fireEvent.click(screen.getByRole('button', { name: /Connect Google Drive/i }));
+    // Click the "click here" button
+    fireEvent.click(screen.getByRole('button', { name: /click here/i }));
     
-    // Check that the action creator was called
-    expect(googleDriveLogin).toHaveBeenCalledTimes(1);
+    // Check that the redirect function was called
+    expect(redirectToGoogleDriveLogin).toHaveBeenCalledTimes(1);
   });
 
-  test('does not show prompt when showPrompt is false', () => {
+  test('does not show loading UI when showPrompt is false', () => {
     renderWithRedux(
-      <GoogleDriveAuthCheck 
-        showPrompt={false}
-      >
-        <div data-testid="children-content">Protected Content</div>
-      </GoogleDriveAuthCheck>,
+      <MemoryRouter>
+        <GoogleDriveAuthCheck showPrompt={false}>
+          <div data-testid="children-content">Protected Content</div>
+        </GoogleDriveAuthCheck>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -95,16 +107,18 @@ describe('GoogleDriveAuthCheck', () => {
       }
     );
 
-    // Should not show the auth prompt
-    expect(screen.queryByText('Google Drive Authentication Required')).not.toBeInTheDocument();
+    // Should not show the loading UI
+    expect(screen.queryByText('Connecting to Google Drive...')).not.toBeInTheDocument();
     
     // Should render children even though not logged in (because showPrompt is false)
     expect(screen.getByTestId('children-content')).toBeInTheDocument();
   });
 
-  test('renders nothing when not logged in and no children', () => {
+  test('renders loading UI when not logged in and no children', () => {
     const { container } = renderWithRedux(
-      <GoogleDriveAuthCheck />,
+      <MemoryRouter>
+        <GoogleDriveAuthCheck showPrompt={true}/>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -114,21 +128,20 @@ describe('GoogleDriveAuthCheck', () => {
       }
     );
 
-    // Should show the auth prompt
-    expect(screen.getByText('Google Drive Authentication Required')).toBeInTheDocument();
-    
-    // Container should only have the auth prompt
-    expect(container.firstChild).toHaveClass('google-auth-prompt');
+    // Should show the loading UI
+    expect(screen.getByText('Connecting to Google Drive...')).toBeInTheDocument();
   });
 
-  test('connected component works with Redux store', () => {
+  test('connected component works with Redux store (logged in)', () => {
     // Use the actual component import with Redux connection
     const ConnectedComponent = require('../../components/GoogleDriveAuthCheck').default;
     
     renderWithRedux(
-      <ConnectedComponent>
-        <div data-testid="children-content">Connected Content</div>
-      </ConnectedComponent>,
+      <MemoryRouter>
+        <ConnectedComponent>
+          <div data-testid="children-content">Connected Content</div>
+        </ConnectedComponent>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -143,14 +156,16 @@ describe('GoogleDriveAuthCheck', () => {
     expect(screen.getByText('Connected Content')).toBeInTheDocument();
   });
 
-  test('connected component shows auth prompt when not logged in', () => {
+  test('connected component shows loading UI when not logged in', () => {
     // Use the actual component import with Redux connection
     const ConnectedComponent = require('../../components/GoogleDriveAuthCheck').default;
     
     renderWithRedux(
-      <ConnectedComponent>
-        <div data-testid="children-content">Connected Content</div>
-      </ConnectedComponent>,
+      <MemoryRouter>
+        <ConnectedComponent showPrompt={true}>
+          <div data-testid="children-content">Connected Content</div>
+        </ConnectedComponent>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -160,13 +175,15 @@ describe('GoogleDriveAuthCheck', () => {
       }
     );
 
-    // Should show auth prompt
-    expect(screen.getByText('Google Drive Authentication Required')).toBeInTheDocument();
+    // Should show loading UI
+    expect(screen.getByText('Connecting to Google Drive...')).toBeInTheDocument();
   });
 
   test('handles undefined children gracefully', () => {
-    const { container } = renderWithRedux(
-      <GoogleDriveAuthCheck />,
+    renderWithRedux(
+      <MemoryRouter>
+        <GoogleDriveAuthCheck driveLoggedIn={true} />
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -176,16 +193,18 @@ describe('GoogleDriveAuthCheck', () => {
       }
     );
 
-    // Should render an empty fragment
-    expect(container.firstChild).toBeNull();
+    // Should not crash and should not show loading UI
+    expect(screen.queryByText('Connecting to Google Drive...')).not.toBeInTheDocument();
   });
 
   test('handles multiple children correctly when logged in', () => {
     renderWithRedux(
-      <GoogleDriveAuthCheck>
-        <div data-testid="first-child">First Child</div>
-        <div data-testid="second-child">Second Child</div>
-      </GoogleDriveAuthCheck>,
+      <MemoryRouter>
+        <GoogleDriveAuthCheck>
+          <div data-testid="first-child">First Child</div>
+          <div data-testid="second-child">Second Child</div>
+        </GoogleDriveAuthCheck>
+      </MemoryRouter>,
       {
         initialState: {
           googledrive: {
@@ -198,5 +217,29 @@ describe('GoogleDriveAuthCheck', () => {
     // Should render both children
     expect(screen.getByTestId('first-child')).toBeInTheDocument();
     expect(screen.getByTestId('second-child')).toBeInTheDocument();
+  });
+
+  test('updates Redux state to logged in when URL contains drive_auth=success', async () => {
+    renderWithRedux(
+      <MemoryRouter initialEntries={['/somepath?drive_auth=success']}>
+        <GoogleDriveAuthCheck>
+          <div data-testid="children-content">Protected Content after OAuth</div>
+        </GoogleDriveAuthCheck>
+      </MemoryRouter>,
+      {
+        initialState: {
+          googledrive: {
+            driveLoggedIn: false
+          }
+        }
+      }
+    );
+    
+    // Wait for the effect in GoogleDriveAuthCheck to run and update the state.
+    // The children should eventually appear when driveLoggedIn becomes true.
+    await waitFor(() => {
+      expect(screen.getByTestId('children-content')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Google Drive Authentication Required')).not.toBeInTheDocument();
   });
 });
