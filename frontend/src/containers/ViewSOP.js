@@ -23,7 +23,7 @@ const ViewSOP = ({ isAuthenticated, driveLoggedIn, user }) => {
   //};
 
   useEffect(() => {
-    if (!driveLoggedIn) return;
+    if (!user) return;
 
     const fetchDocument = async () => {
       try {
@@ -69,7 +69,7 @@ const ViewSOP = ({ isAuthenticated, driveLoggedIn, user }) => {
     };
 
     fetchDocument();
-  }, [id, driveLoggedIn, user.id]);
+  }, [id, driveLoggedIn, user]);
 
   return (
     <GoogleDriveAuthCheck showPrompt={true}>
