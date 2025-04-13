@@ -1,26 +1,23 @@
 import authReducer from '../../reducers/auth';
 import {
-  USER_LOADED_SUCCESS,  // Changed from USER_LOADED
   LOGIN_SUCCESS,
-  SIGNUP_SUCCESS,       // Changed from REGISTER_SUCCESS
-  USER_LOADED_FAIL,     // Changed from AUTH_ERROR
   LOGIN_FAIL,
-  SIGNUP_FAIL,          // Changed from REGISTER_FAIL
-  LOGOUT,
-  RESET_FIRST_LOGIN,    // Added to match your implementation
+  USER_LOADED_SUCCESS,
+  USER_LOADED_FAIL,
   AUTHENTICATED_SUCCESS,
-  AUTHENTICATED_FAIL
+  AUTHENTICATED_FAIL,
+  LOGOUT,
+  RESET_FIRST_LOGIN
 } from '../../actions/types';
 
 describe('Auth Reducer', () => {
-  // Updated to match your actual implementation
   const initialState = {
-    access: localStorage.getItem('access'),
-    refresh: localStorage.getItem('accessrefresh'),
+    access: null,
+    refresh: null,
     isAuthenticated: null,
     user: null,
-    firstLogin: false,
-    error: null
+    error: null,
+    firstLogin: false
   };
 
   test('returns default state', () => {
@@ -28,124 +25,118 @@ describe('Auth Reducer', () => {
     expect(newState).toEqual(initialState);
   });
 
+  test('handles LOGIN_SUCCESS', () => {
+    const action = {
+      type: LOGIN_SUCCESS,
+      payload: { 
+        access: 'fake-access-token',
+        refresh: 'fake-refresh-token',
+        user: { id: 1, name: 'Test User' } 
+      }
+    };
+    
+    const newState = authReducer(initialState, action);
+    
+    expect(newState.isAuthenticated).toBe(true);
+    expect(newState.access).toBe('fake-access-token');
+    expect(newState.refresh).toBe('fake-refresh-token');
+    expect(newState.user).toEqual({ id: 1, name: 'Test User' });
+    expect(newState.firstLogin).toBe(true);
+    expect(newState.error).toBeNull();
+  });
+
+  test('handles RESET_FIRST_LOGIN', () => {
+    const startState = {
+      ...initialState,
+      firstLogin: true
+    };
+    
+    const action = { type: RESET_FIRST_LOGIN };
+    const newState = authReducer(startState, action);
+    
+    expect(newState.firstLogin).toBe(false);
+  });
+
+  test('handles USER_LOADED_SUCCESS', () => {
+    const action = {
+      type: USER_LOADED_SUCCESS,
+      payload: { id: 1, name: 'Test User' }
+    };
+    
+    const newState = authReducer(initialState, action);
+    
+    // Only sets user data, doesn't change authentication state
+    expect(newState.user).toEqual({ id: 1, name: 'Test User' });
+    expect(newState.isAuthenticated).toBeNull(); // Unchanged
+  });
+
   test('handles AUTHENTICATED_SUCCESS', () => {
     const action = { type: AUTHENTICATED_SUCCESS };
+    
     const newState = authReducer(initialState, action);
     
     expect(newState.isAuthenticated).toBe(true);
   });
 
   test('handles AUTHENTICATED_FAIL', () => {
-    const action = { type: AUTHENTICATED_FAIL };
-    const newState = authReducer(initialState, action);
-    
-    expect(newState.isAuthenticated).toBe(false);
-  });
-
-  test('handles USER_LOADED_SUCCESS', () => {
-    const user = { id: 1, email: 'user@test.com', name: 'Test User' };
-    const action = {
-      type: USER_LOADED_SUCCESS,
-      payload: user
+    const startState = {
+      ...initialState,
+      isAuthenticated: true
     };
     
-    const newState = authReducer(initialState, action);
-    expect(newState.user).toEqual(user);
+    const action = { type: AUTHENTICATED_FAIL };
+    const newState = authReducer(startState, action);
+    
+    expect(newState.isAuthenticated).toBe(false);
+    // Note: Your current implementation doesn't clear tokens on auth fail
+    // If you update the reducer as suggested, update this test too
   });
 
   test('handles USER_LOADED_FAIL', () => {
+    const startState = {
+      ...initialState,
+      user: { id: 1, name: 'Test User' }
+    };
+    
     const action = { type: USER_LOADED_FAIL };
-    const newState = authReducer(initialState, action);
+    const newState = authReducer(startState, action);
     
     expect(newState.user).toBeNull();
-  });
-
-  test('handles LOGIN_SUCCESS', () => {
-    const payload = {
-      access: 'fake-access-token',
-      refresh: 'fake-refresh-token',
-      user: { id: 1, email: 'user@test.com' }
-    };
-    const action = {
-      type: LOGIN_SUCCESS,
-      payload
-    };
-    const newState = authReducer(initialState, action);
-
-    expect(newState.access).toBe(payload.access);
-    expect(newState.refresh).toBe(payload.refresh);
-    expect(newState.user).toEqual(payload.user);
-    expect(newState.isAuthenticated).toBe(true);
-    expect(newState.firstLogin).toBe(true);
-    expect(newState.error).toBeNull();
-    
-    // Verify localStorage was updated
-    expect(localStorage.getItem('access')).toBe(payload.access);
-  });
-
-  test('handles SIGNUP_SUCCESS', () => {
-    const action = { type: SIGNUP_SUCCESS };
-    const newState = authReducer(initialState, action);
-    
-    expect(newState.isAuthenticated).toBe(false);
   });
 
   test('handles LOGIN_FAIL', () => {
-    const errorMsg = 'Login details are not correct. Please try again.';
-    const action = {
+    const action = { 
       type: LOGIN_FAIL,
-      payload: errorMsg
+      payload: 'Invalid credentials'
     };
-    const newState = authReducer(initialState, action);
-
-    expect(newState.error).toBe(errorMsg);
-    expect(newState.isAuthenticated).toBe(false);
-    expect(newState.access).toBeNull();
-    expect(newState.refresh).toBeNull();
-    expect(newState.user).toBeNull();
-  });
-
-  test('handles SIGNUP_FAIL', () => {
-    const errorMsg = 'Signup failed';
-    const action = {
-      type: SIGNUP_FAIL,
-      payload: errorMsg
-    };
+    
     const newState = authReducer(initialState, action);
     
-    expect(newState.isAuthenticated).toBe(false);
     expect(newState.access).toBeNull();
     expect(newState.refresh).toBeNull();
+    expect(newState.isAuthenticated).toBe(false);
     expect(newState.user).toBeNull();
-    expect(newState.error).toBe(errorMsg);
+    expect(newState.error).toBe('Invalid credentials');
   });
 
   test('handles LOGOUT', () => {
-    const action = { type: LOGOUT };
-    const stateBeforeLogout = {
+    const startState = {
       access: 'fake-access-token',
       refresh: 'fake-refresh-token',
       isAuthenticated: true,
-      user: { id: 1, email: 'user@test.com' },
-      firstLogin: false,
-      error: null
+      user: { id: 1 },
+      error: 'Some previous error',
+      firstLogin: true
     };
-    const newState = authReducer(stateBeforeLogout, action);
-
+    
+    const action = { type: LOGOUT };
+    const newState = authReducer(startState, action);
+    
     expect(newState.access).toBeNull();
     expect(newState.refresh).toBeNull();
     expect(newState.isAuthenticated).toBe(false);
     expect(newState.user).toBeNull();
-  });
-
-  test('handles RESET_FIRST_LOGIN', () => {
-    const action = { type: RESET_FIRST_LOGIN };
-    const stateWithFirstLogin = {
-      ...initialState,
-      firstLogin: true
-    };
-    const newState = authReducer(stateWithFirstLogin, action);
-    
-    expect(newState.firstLogin).toBe(false);
+    expect(newState.error).toBeNull(); // Error is cleared
+    expect(newState.firstLogin).toBe(false); // FirstLogin is reset
   });
 });

@@ -23,6 +23,7 @@ const DocumentGrid = ({
   const CustomToggle = React.forwardRef(({ children, onClick }, ref) => (
     <button
       ref={ref}
+      aria-label="Document options" 
       className="btn btn-link text-dark p-0 m-0"
       style={{ 
         position: 'absolute', 

@@ -184,6 +184,8 @@ dmypy.json
 # profiling data
 .prof
 
+# Ignore coverage reports
+frontend/coverage/lcov-report/
 
 backend/client_secret.json
 

@@ -159,7 +159,7 @@ const EditTeam = ({ editTeam, updateMemberRole, removeMember, user, teams }) => 
                 </div>
 
                 {/* Submit button moved to the bottom */}
-                <form onSubmit={onSubmit}>
+                <form onSubmit={onSubmit} data-testid="edit-team-form">
                     <button className="btn btn-primary w-100 mb-3" type='submit'>Update Team</button>
                 </form>
             </div>

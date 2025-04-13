@@ -16,10 +16,10 @@ const Sidebar = ( { user } ) => {
             <div className="sidebar-sticky">
                 <div className="user-info">
                     <div className="user-greeting">
-                    {user && (
-                            <span className="user-initial">
-                                {getUserInitial(user.name)}
-                            </span>
+                        {user && (
+                            <div className="user-avatar" data-testid="user-avatar">
+                                {user.name ? user.name.charAt(0) : ''}
+                            </div>
                         )}
                     </div>
                 </div>

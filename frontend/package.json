@@ -30,6 +30,7 @@
     "start": "react-scripts start",
     "build": "rmdir /s /q ..\\backend\\build && react-scripts build && xcopy build ..\\backend\\build /e /i /y",
     "test": "react-scripts test",
+    "test:coverage": "react-scripts test --coverage --watchAll=false",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -57,15 +58,10 @@
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.4.3",
+    "axios-mock-adapter": "^2.1.0",
     "babel-jest": "^29.7.0",
     "jest": "^27.5.1",
     "jest-environment-jsdom": "^29.7.0",
     "redux-mock-store": "^1.5.5"
-  },
-  "jest": {
-    "testMatch": [
-      "**/__tests__/**/*.js?(x)",
-      "**/?(*.)+(spec|test).js?(x)"
-    ]
   }
 }

@@ -26,5 +26,16 @@ module.exports = {
   testMatch: ["**/__tests__/**/*.js?(x)", "**/?(*.)+(spec|test).js?(x)"],
   
   // Ignore test paths
-  testPathIgnorePatterns: ["/node_modules/", "/build/"]
+  testPathIgnorePatterns: ["/node_modules/", "/build/"],
+
+  // Coverage configuration
+  collectCoverageFrom: [
+    "src/**/*.{js,jsx}",
+    "!src/index.js",
+    "!src/reportWebVitals.js",
+    "!src/setupTests.js",
+    "!**/node_modules/**"
+  ],
+  coverageReporters: ["text", "lcov", "html"],
+  coverageDirectory: "coverage"
 };

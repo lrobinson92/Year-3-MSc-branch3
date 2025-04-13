@@ -23,10 +23,6 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
 
-
-
-
-
   // Check if we should redirect to view a document after authentication
   useEffect(() => {
     if (driveLoggedIn) {
@@ -156,11 +152,12 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
       <div className="main-content">
         <div className="recent-items-card">
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h2>All Documents</h2>
+            <h2 data-testid="documents-heading">All Documents</h2>
             {driveLoggedIn && (
               <Link 
                 to="/create-document" 
                 className="btn btn-primary d-flex align-items-center"
+                data-testid="create-document-button"
               >
                 <span className="me-1">+</span> Create Document
               </Link>
@@ -182,7 +179,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
               <>
                 {/* Personal Documents Section */}
                 <div className="mb-5">
-                  <h3 className="mb-3">Personal Documents</h3>
+                  <h3 className="mb-3" data-testid="personal-documents-heading">Personal Documents</h3>
                   <DocumentGrid
                     documents={sortedDocuments.personal}
                     emptyMessage="No personal documents available"

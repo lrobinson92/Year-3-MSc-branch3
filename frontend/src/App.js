@@ -24,7 +24,6 @@ import CreateDocument from './containers/CreateDocument';
 import TeamDetail from './containers/TeamDetail';
 import Help from './containers/Help';
 import GoogleAuthCallback from './containers/GoogleAuthCallback';
-import ApiDebug from './containers/ApiDebug'; // Import the new component
 import './globalStyles.css';
 
 // Import Redux components
@@ -87,7 +86,6 @@ const App = () => {
                         <Route path="/team/:teamId" element={<TeamDetail />} />
                         <Route path="/help" element={<Help />} />
                         <Route path="/google-auth-callback" element={<GoogleAuthCallback />} />
-                        <Route path="/api-debug" element={<ApiDebug />} />
                         {/*<Route path='*' element={<h1>Route Not Found</h1>} />*/}
                     </Routes>            
                 </Layout>

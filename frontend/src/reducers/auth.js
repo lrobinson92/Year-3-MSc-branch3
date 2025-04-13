@@ -62,8 +62,12 @@ const initialState = {
                 user: payload
             };
         case AUTHENTICATED_FAIL:
+            localStorage.removeItem('access');
+            localStorage.removeItem('refresh');
             return {
                 ...state,
+                access: null,
+                refresh: null,
                 isAuthenticated: false
             };
         case USER_LOADED_FAIL:
