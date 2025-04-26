@@ -41,6 +41,10 @@ cp .env.example .env
 
 # Run development server
 python manage.py runserver
+
+# Start the notification listener (run in a separate terminal)
+# This command listens for PostgreSQL notifications and sends emails for reminders for tasks that are due soon
+python manage.py listen_for_notifications
 ```
 
 ### Frontend Setup
