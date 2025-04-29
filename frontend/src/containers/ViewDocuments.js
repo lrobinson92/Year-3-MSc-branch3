@@ -84,7 +84,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     
     Object.keys(teams).forEach(teamId => {
       teams[teamId].documents.sort((a, b) => 
-        new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
+        new Date(b.updated_at || b.created_at) - Date(a.updated_at || a.created_at)
       );
     });
 

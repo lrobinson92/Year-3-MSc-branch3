@@ -1,15 +1,9 @@
 import React from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { FaQuestion, FaBug } from 'react-icons/fa';
+import { FaQuestion } from 'react-icons/fa';
 
 const Sidebar = ( { user } ) => {
-
-    const location = useLocation();
-
-    const getUserInitial = (name) => {
-        return name ? name.charAt(0).toUpperCase() : '';
-    };
     
     return (
         <nav className="col-md-2 d-none d-md-block sidebar">
@@ -17,7 +11,7 @@ const Sidebar = ( { user } ) => {
                 <div className="user-info">
                     <div className="user-greeting">
                         {user && (
-                            <div className="user-avatar" data-testid="user-avatar">
+                            <div className="user-initial" data-testid="user-initial">
                                 {user.name ? user.name.charAt(0) : ''}
                             </div>
                         )}

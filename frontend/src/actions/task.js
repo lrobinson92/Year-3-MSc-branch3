@@ -11,7 +11,6 @@ import {
     TASK_UPDATE_FAIL,
     TASK_DELETE_SUCCESS,
     TASK_DELETE_FAIL,
-    // Map to existing action types for compatibility
     FETCH_TASKS_SUCCESS,
     FETCH_TASKS_FAIL,
     CREATE_TASK_SUCCESS,
@@ -19,12 +18,11 @@ import {
     EDIT_TASK_SUCCESS,
     EDIT_TASK_FAIL,
     DELETE_TASK_SUCCESS,
-    DELETE_TASK_FAIL
+    DELETE_TASK_FAIL,
+    FETCH_TEAM_MEMBERS_SUCCESS,
+    FETCH_TEAM_MEMBERS_FAIL
 } from './types';
-import React from 'react';
-import { FaSpinner, FaCircle, FaCheckCircle } from 'react-icons/fa';
-import { LuCircleDashed } from 'react-icons/lu';
-import { toTitleCase } from '../utils/utils';
+
 
 // Function to get appropriate status icon with tooltip
 export const getStatusIconWithTooltip = (status) => {
@@ -239,6 +237,52 @@ export const deleteTask = (taskId) => async dispatch => {
         });
         
         throw err;
+    }
+};
+
+// Fetch team members
+export const fetchTeamMembers = (teamId, userId) => async dispatch => {
+    try {
+        if (!teamId) {
+            // For personal tasks, just return the current user
+            dispatch({
+                type: 'FETCH_TEAM_MEMBERS_SUCCESS',
+                payload: { teamMembers: [], isOwner: false }
+            });
+            return;
+        }
+        
+        const response = await axiosInstance.get(
+            `${process.env.REACT_APP_API_URL}/api/teams/${teamId}/users-in-same-team/`, 
+            { withCredentials: true }
+        );
+        
+        const members = Array.isArray(response.data) ? response.data : [];
+        
+        // Check if current user is team owner
+        const isOwner = members.some(member => member.user === userId && member.role === 'owner');
+        
+        // Filter members based on role
+        const visibleMembers = isOwner ? members : members.filter(member => member.user === userId);
+        
+        dispatch({
+            type: 'FETCH_TEAM_MEMBERS_SUCCESS',
+            payload: { 
+                teamMembers: visibleMembers,
+                isOwner
+            }
+        });
+        
+        return visibleMembers;
+    } catch (err) {
+        console.error('Failed to fetch team members:', err);
+        
+        dispatch({
+            type: 'FETCH_TEAM_MEMBERS_FAIL',
+            payload: err.response?.data || 'Failed to fetch team members'
+        });
+        
+        return [];
     }
 };
 

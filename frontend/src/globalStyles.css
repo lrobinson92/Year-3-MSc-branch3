@@ -100,22 +100,7 @@ ul.member-list li {
     z-index: 2;
 }
 
-/* Tooltip */
-.member-initial:hover::after {
-    content: attr(data-fullname); /* Display full name */
-    position: absolute;
-    bottom: 100%; /* Position above the circle */
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #111049;
-    color: #f2f2f2;
-    padding: 5px 10px;
-    border-radius: 5px;
-    white-space: nowrap;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    z-index: 10;
-    font-size: 0.8em; /* Smaller font size for tooltip */
-}
+
 
 /* Remove bullet points and display inline */
 ul.member-list {
@@ -732,3 +717,13 @@ ul.member-list {
     flex-grow: 1;
 }
 
+/* Modal styling for better text contrast */
+.modal-title, .modal-body {
+    color: #1a1a4f !important;
+    font-weight: 500;
+}
+
+/* For task-specific modals */
+.task-modal .modal-content {
+    color: #1a1a4f;
+}

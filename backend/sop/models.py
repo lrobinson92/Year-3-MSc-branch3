@@ -56,15 +56,13 @@ class Team(models.Model):
         related_name="created_teams"
     )
     members = models.ManyToManyField(
-        UserAccount,  # Reference your custom user model
-        through='TeamMembership',  # Specify the through model
-        related_name='teams'  # Allows reverse lookup like user.teams.all()
+        UserAccount,  
+        through='TeamMembership', 
+        related_name='teams'  
     )
 
     def __str__(self):
         return self.name
-
-
 
 class TeamMembership(models.Model):
     ROLE_CHOICES = [
@@ -103,7 +101,7 @@ class Task(models.Model):
         IN_PROGRESS = 'in_progress', _('In Progress')
         COMPLETE = 'complete', _('Complete')
     
-    description = models.CharField(max_length=255)
+    description = models.TextField()
     assigned_to = models.ForeignKey(
         'UserAccount',
         on_delete=models.SET_NULL,
@@ -124,7 +122,7 @@ class Task(models.Model):
         choices=Status.choices,
         default=Status.NOT_STARTED
     )
-    created_at = models.DateTimeField(default=timezone.now)  # Not auto_now_add to allow migration
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
@@ -134,13 +132,15 @@ class Task(models.Model):
 class Document(models.Model):
     title = models.CharField(max_length=255)
     file_url = models.URLField()
-    google_drive_file_id = models.CharField(max_length=255, blank=True, null=True)  # New field for Google Drive file ID
+    google_drive_file_id = models.CharField(max_length=255, blank=True, null=True)
     owner = models.ForeignKey(UserAccount, on_delete=models.CASCADE)
     team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
-    review_date = models.DateField(null=True, blank=True)  # New field for review date
+    review_date = models.DateField(null=True, blank=True)  
     review_reminder_sent = models.BooleanField(default=False)  # Track if reminder has been sent
 
     def __str__(self):
         return self.title
+
+

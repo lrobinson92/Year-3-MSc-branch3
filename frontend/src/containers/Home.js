@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { FaFileAlt, FaUsers, FaCheckSquare, FaGoogle, FaRocket, FaLightbulb } from 'react-icons/fa';
 import bannerImage from '../assests/images/night-sky.jpg';
-import cardPreview from '../assests/images/card-preview.jpg';
+import cardPreview from '../assests/images/dashboard.png';
 
 const Home = ({ isAuthenticated }) => {
     // SOPify brand purple color

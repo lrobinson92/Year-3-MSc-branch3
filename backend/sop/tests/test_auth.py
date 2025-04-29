@@ -9,15 +9,14 @@ class UserRegistrationTestCase(TestCase):
     
     def setUp(self):
         self.client = APIClient()
-        # Correct URL based on URL discovery
         self.register_url = '/auth/users/'
         
-        # Valid user data matching your frontend form structure
+        # Valid user data matching frontend form structure
         self.valid_user_data = {
             'email': 'test@example.com',
             'name': 'Test User',
             'password': 'StrongPass123!',
-            're_password': 'StrongPass123!'  # Djoser uses re_password, not password2
+            're_password': 'StrongPass123!'
         }
         
         # Create an existing user for duplicate testing
@@ -35,7 +34,7 @@ class UserRegistrationTestCase(TestCase):
             format='json'
         )
         
-        # Check response - Djoser returns 201 CREATED
+        # Check response
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         
         # Verify user is in database
@@ -145,7 +144,6 @@ class UserLoginTestCase(TestCase):
     
     def setUp(self):
         self.client = APIClient()
-        # Correct JWT login URL from URL discovery
         self.login_url = '/auth/jwt/create/'
         
         # Create a test user
@@ -170,7 +168,7 @@ class UserLoginTestCase(TestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # Check for JWT tokens in response body (djoser JWT format)
+        # Check for JWT tokens in response body
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
     

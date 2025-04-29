@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { connect } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { FaEdit, FaTrash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronUp, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import { updateTaskStatus, deleteTask } from '../actions/task';
 import { formatDate } from '../utils/utils';
 import Modal from 'react-bootstrap/Modal';
@@ -27,6 +27,75 @@ const TaskTable = ({
     const [showCompleteModal, setShowCompleteModal] = useState(false);
     const [taskToComplete, setTaskToComplete] = useState(null);
     const [expandedDescriptions, setExpandedDescriptions] = useState({});
+    
+    // Add sorting state
+    const [sortConfig, setSortConfig] = useState({
+        key: 'due_date',
+        direction: 'ascending'
+    });
+    
+    // Sorted tasks state
+    const [sortedTasks, setSortedTasks] = useState([]);
+    
+    // Sort tasks when the component loads or when tasks/sort config changes
+    useEffect(() => {
+        let tasksToSort = [...tasks];
+        
+        if (sortConfig.key) {
+            tasksToSort.sort((a, b) => {
+                // Handle null values
+                if (!a[sortConfig.key] && !b[sortConfig.key]) return 0;
+                if (!a[sortConfig.key]) return 1;
+                if (!b[sortConfig.key]) return -1;
+                
+                // Special handling for due dates
+                if (sortConfig.key === 'due_date') {
+                    const dateA = new Date(a[sortConfig.key]);
+                    const dateB = new Date(b[sortConfig.key]);
+                    
+                    if (sortConfig.direction === 'ascending') {
+                        return dateA - dateB;
+                    } else {
+                        return dateB - dateA;
+                    }
+                }
+                
+                // For other string fields
+                if (a[sortConfig.key] < b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (a[sortConfig.key] > b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        
+        setSortedTasks(tasksToSort);
+    }, [tasks, sortConfig]);
+    
+    // Request sort function
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        
+        // If already sorting by this key, toggle direction
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        
+        setSortConfig({ key, direction });
+    };
+    
+    // Get sort direction icon
+    const getSortDirectionIcon = (columnName) => {
+        if (sortConfig.key !== columnName) {
+            return <FaSort className="ms-1 text-muted" size={12} />;
+        }
+        
+        return sortConfig.direction === 'ascending' 
+            ? <FaSortUp className="ms-1" size={12} /> 
+            : <FaSortDown className="ms-1" size={12} />;
+    };
 
     const handleRowClick = (task) => {
         if (onRowClick) {
@@ -74,6 +143,16 @@ const TaskTable = ({
         return dueDate.setHours(0, 0, 0, 0) < now.setHours(0, 0, 0, 0);
     };
 
+    const isComingSoon = (due) => {
+        if (!due) return false;
+        const dueDate = new Date(due);
+        const now = new Date();
+        const diffTime = dueDate - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        // Consider tasks due in the next 7 days as "due soon"
+        return diffDays > 0 && diffDays <= 7;
+    };
+
     const toggleDescription = (e, taskId) => {
         e.stopPropagation();
         setExpandedDescriptions(prev => ({
@@ -102,12 +181,23 @@ const TaskTable = ({
                             {showColumns.status && <th>Status</th>}
                             {showColumns.assignedTo && <th>Assigned To</th>}
                             {showColumns.teamName && <th>Team</th>}
-                            {showColumns.dueDate && <th>Due Date</th>}
+                            {showColumns.dueDate && (
+                                <th 
+                                    className="sortable-header" 
+                                    onClick={() => requestSort('due_date')}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <div className="d-flex align-items-center">
+                                        Due Date
+                                        {getSortDirectionIcon('due_date')}
+                                    </div>
+                                </th>
+                            )}
                             {showColumns.actions && <th className="text-center action-column">Actions</th>}
                         </tr>
                     </thead>
                     <tbody>
-                        {tasks.map(task => (
+                        {sortedTasks.map(task => (
                             <React.Fragment key={task.id}>
                                 <tr
                                     className={isPastDue(task.due_date) && task.status !== 'complete' ? 'table-danger' : ''}
@@ -136,7 +226,22 @@ const TaskTable = ({
                                     {showColumns.status && <td><span className={`badge bg-${task.status === 'complete' ? 'success' : task.status === 'in_progress' ? 'primary' : 'secondary'}`}>{task.status.replace('_', ' ')}</span></td>}
                                     {showColumns.assignedTo && <td>{task.assigned_to_name || 'Unassigned'}</td>}
                                     {showColumns.teamName && <td>{task.team_name || '—'}</td>}
-                                    {showColumns.dueDate && <td>{task.due_date ? formatDate(task.due_date) : '—'}</td>}
+                                    {showColumns.dueDate && (
+                                        <td>
+                                            {task.due_date ? (
+                                                <div className="d-flex align-items-center">
+                                                    {formatDate(task.due_date)}
+                                                    {isPastDue(task.due_date) && task.status !== 'complete' ? (
+                                                        <span className="badge bg-danger ms-2 text-white" style={{ fontSize: '0.65rem' }}>Overdue</span>
+                                                    ) : (
+                                                        isComingSoon(task.due_date) && task.status !== 'complete' && (
+                                                            <span className="badge bg-warning ms-2 text-dark" style={{ fontSize: '0.65rem' }}>Due soon</span>
+                                                        )
+                                                    )}
+                                                </div>
+                                            ) : '—'}
+                                        </td>
+                                    )}
                                     {showColumns.actions && (
                                         <td>
                                             <div className="d-flex justify-content-center gap-2">

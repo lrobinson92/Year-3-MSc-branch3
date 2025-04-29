@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { createTask } from '../actions/task';
-import axiosInstance from '../utils/axiosConfig';
+import { createTask, fetchTeamMembers } from '../actions/task';
+import { fetchTeams } from '../actions/team';
 import { FaArrowLeft } from 'react-icons/fa';
 
-const CreateTask = ({ createTask, isAuthenticated, user }) => {
+// This component is a form for creating new tasks
+const CreateTask = ({ 
+    createTask, 
+    fetchTeams,
+    fetchTeamMembers,
+    isAuthenticated, 
+    user,
+    teams,
+    teamMembers,
+    teamsLoading,
+    teamMembersLoading
+}) => {
+    // Store and track the task information entered by user
     const [formData, setFormData] = useState({
         description: '',
         assigned_to: user ? user.id : '',
@@ -13,58 +25,24 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
         due_date: '',
         status: 'not_started',
     });
-    const [teams, setTeams] = useState([]);
-    const [filteredUsers, setFilteredUsers] = useState([]);
 
+    // Extract values from the form data for easier access
     const { description, assigned_to, team, due_date, status } = formData;
     const navigate = useNavigate();
 
+    // When component loads, fetch teams
     useEffect(() => {
-        // Fetch teams on initial render
-        const fetchTeams = async () => {
-            try {
-                const teamsRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, { withCredentials: true });
-                setTeams(Array.isArray(teamsRes.data) ? teamsRes.data : []);
-            } catch (err) {
-                console.error('Failed to fetch teams:', err);
-            }
-        };
-
         fetchTeams();
-    }, []);
+    }, [fetchTeams]);
 
+    // When team selection changes, fetch members
     useEffect(() => {
-        // Fetch users based on the selected team
-        const fetchUsers = async () => {
-            if (team) {
-                try {
-                    const usersRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/${team}/users-in-same-team/`, { withCredentials: true });
-                    console.log('Fetched users:', usersRes.data); // Debugging log
-                    
-                    if (Array.isArray(usersRes.data)) {
-                        const isOwner = usersRes.data.some(member => member.user === user.id && member.role === 'owner');
-                        
-                        const visibleUsers = isOwner
-                            ? usersRes.data // show all if owner
-                            : usersRes.data.filter(member => member.user === user.id); // show only self otherwise
+        if (user) {
+            fetchTeamMembers(team, user.id);
+        }
+    }, [team, user, fetchTeamMembers]);
 
-                        setFilteredUsers(visibleUsers);
-                    } else {
-                        setFilteredUsers([]);
-                    }
-                } catch (err) {
-                    console.error('Failed to fetch users:', err);
-                    setFilteredUsers([]);
-                }
-            } else {
-                // For personal tasks, only show the current user
-                setFilteredUsers(user ? [user] : []);
-            }
-        };
-
-        fetchUsers();
-    }, [team, user]);
-
+    // When user data loads, update the form to assign task to current user
     useEffect(() => {
         if (user) {
             setFormData(prevFormData => ({
@@ -74,48 +52,60 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
         }
     }, [user]);
 
+    // Function to update form data when user changes fields
     const onChange = (e) => {
         const { name, value } = e.target;
         
         setFormData((prevState) => ({
           ...prevState,
           [name]: value,
+          // If team changes, reset assigned_to field
           ...(name === 'team'
             ? { assigned_to: value ? '' : (user ? user.id : '') }
             : {})
         }));
       };
 
+    // Function that runs when the form is submitted
     const onSubmit = async (e) => {
         e.preventDefault();
         try {
+            // Send the task information to the server
             await createTask({ description, assigned_to, team, due_date, status });
+            // Show success message
             alert("Task created successfully!");
+            // Redirect to tasks page
             navigate('/view/tasks');
         } catch (error) {
+            // Show error message if task creation fails
             alert("Failed to create task. Please try again.");
         }
     };
 
+    // If user is not logged in, redirect to login page
     if (!isAuthenticated) {
         return <Navigate to="/login" />;
     }
 
+    // Function to handle the back button click
     const handleGoBack = () => {
-        navigate(-1); // This navigates back one step in history
+        navigate(-1); // Go back to previous page
     };
 
     return (
         <div className="container mt-5 entry-container">
+            {/* Back button */}
             <FaArrowLeft 
-                                        className="back-arrow" 
-                                        onClick={handleGoBack} 
-                                        style={{ cursor: 'pointer' }}
-                                        title="Go back to previous page" 
-                                    />
+                className="back-arrow" 
+                onClick={handleGoBack} 
+                style={{ cursor: 'pointer' }}
+                title="Go back to previous page" 
+            />
+            {/* Task creation form card */}
             <div className="card p-4 mx-auto" style={{ maxWidth: '400px' }}>
                 <h1 className="text-center mb-4">Create Task</h1>
                 <form onSubmit={onSubmit}>
+                    {/* Task description input */}
                     <div className="form-group mb-3">
                         <label htmlFor="description">Description</label>
                         <textarea
@@ -128,6 +118,7 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                             required
                         />
                     </div>
+                    {/* Team selection dropdown */}
                     <div className="form-group mb-3">
                         <label htmlFor="team">Team (Optional)</label>
                         <select
@@ -143,6 +134,7 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                             ))}
                         </select>
                     </div>
+                    {/* Assigned user selection dropdown */}
                     <div className="form-group mb-3">
                         <label htmlFor="assigned_to">Assigned To</label>
                         <select
@@ -154,18 +146,21 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                             required
                         >
                             <option value="">Select Member</option>
+                            {/* Show current user for personal tasks */}
                             {!team && user && (
                                 <option value={user.id}>{user.name}</option>
                             )}
-                            {filteredUsers.map(user => (
-                            user && user.user && user.user_name ? (
-                                <option key={user.user} value={user.user}>
-                                {user.user_name}
-                                </option>
-                            ) : null
+                            {/* Show team members from Redux state */}
+                            {teamMembers.map(member => (
+                                member && member.user && member.user_name ? (
+                                    <option key={member.user} value={member.user}>
+                                        {member.user_name}
+                                    </option>
+                                ) : null
                             ))}
                         </select>
                     </div>
+                    {/* Due date selection */}
                     <div className="form-group mb-3">
                         <label htmlFor="due_date">Due Date</label>
                         <input
@@ -178,6 +173,7 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                             required
                         />
                     </div>
+                    {/* Task status dropdown */}
                     <div className="form-group mb-3">
                         <label htmlFor="status">Status</label>
                         <select
@@ -192,6 +188,7 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
                             <option value="complete">Complete</option>
                         </select>
                     </div>
+                    {/* Submit button */}
                     <button className="btn btn-primary w-100" type="submit">
                         Create Task
                     </button>
@@ -201,9 +198,18 @@ const CreateTask = ({ createTask, isAuthenticated, user }) => {
     );
 };
 
+// Connect component to Redux state management
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
     user: state.auth.user,
+    teams: state.team.teams,
+    teamsLoading: state.team.loading,
+    teamMembers: state.task.teamMembers,
+    teamMembersLoading: state.task.loading,
 });
 
-export default connect(mapStateToProps, { createTask })(CreateTask);
+export default connect(mapStateToProps, { 
+    createTask, 
+    fetchTeams,
+    fetchTeamMembers 
+})(CreateTask);

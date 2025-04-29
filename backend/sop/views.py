@@ -2,9 +2,9 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.mail import send_mail
-from django.db.models import Q  # Import Q
+from django.db.models import Q 
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import HttpResponseRedirect, redirect, get_object_or_404
+from django.shortcuts import  redirect, get_object_or_404
 from django.utils.dateparse import parse_datetime
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -13,40 +13,62 @@ from pydrive2.drive import GoogleDrive
 from oauth2client.client import OAuth2Credentials
 from openai import OpenAI
 from rest_framework import status, generics, viewsets, permissions
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from sop.serializers import UserCreateSerializer, DocumentSerializer
 from .models import UserAccount, Team, TeamMembership, Task, Document
-from .permissions import IsOwnerOrAssignedUser, IsTeamMemberOrTaskOwner
+from .permissions import IsTeamMemberOrTaskOwner
 from .serializers import TeamSerializer, TaskSerializer
-import docx2txt
-import json
+from .services.google_drive_service import GoogleDriveService
+from .helpers.permission_helpers import validate_team_membership
+
 import logging
-import openai
-import os
 import requests
-import time
-import tempfile
-import urllib.parse
 
-logger = logging.getLogger(__name__)  # Use Django's logging system
+# Initialize Django's logging system
+logger = logging.getLogger(__name__)
 
+# Get the user model specified in settings
 User = get_user_model()
 
+# Prompt template for OpenAI API to generate SOPs with the correct format
+GENERATION_PROMPT = """You are creating a professional Standard Operating Procedure.
+
+FORMAT:
+TITLE: {title}
+PURPOSE: A clear statement of the SOP's objective
+SCOPE: Define what activities and personnel this covers
+PROCEDURE: Numbered steps in chronological order
+REFERENCES: Related documents or regulations
+
+Use concise, direct language with active voice. Include all necessary details without explanations outside this format."""
+
 class TeamViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Team model operations.
+    Provides CRUD operations with permission checks.
+    """
     queryset = Team.objects.all()
     serializer_class = TeamSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        """
+        Only return teams the current user belongs to.
+        """
         user = self.request.user
         return Team.objects.filter(team_memberships__user=user)
 
     def perform_create(self, serializer):
+        """
+        When creating a team:
+        1. Save the team with the current user as creator
+        2. Add the creator as an owner in team memberships
+        """
         team = serializer.save(created_by=self.request.user)
-        # Create a TeamMembership entry for the creator
+        # Create a TeamMembership entry for the creator with owner role
         TeamMembership.objects.create(
             user=self.request.user,
             team=team,
@@ -54,7 +76,8 @@ class TeamViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        """Only allow team owners to delete teams"""
+        """Only allow team owners to delete teams.
+        Raises PermissionDenied if non-owner attempts deletion."""
         # Check if the requesting user is the owner
         is_owner = TeamMembership.objects.filter(
             user=self.request.user, 
@@ -70,9 +93,17 @@ class TeamViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def invite_member(self, request, pk=None):
+        """
+        Invite a user to a team.
+        Handles:
+        - Permission checking (only owners can invite)
+        - Email validation
+        - Sends email notification to invited user
+        - Creates TeamMembership record
+        """
         team = self.get_object()
         email = request.data.get('email')
-        role = request.data.get('role', 'member')
+        role = request.data.get('role', 'member')  # Default role is 'member'
 
         # Check if the requesting user is a team owner
         try:
@@ -82,12 +113,15 @@ class TeamViewSet(viewsets.ModelViewSet):
         except TeamMembership.DoesNotExist:
             return Response({'error': 'You are not a member of this team.'}, status=status.HTTP_403_FORBIDDEN)
 
+        # Validate the role
         if role not in dict(TeamMembership.ROLE_CHOICES):
             return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Validate email input
         if not email:
             return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Find the user by email
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
@@ -97,10 +131,10 @@ class TeamViewSet(viewsets.ModelViewSet):
         if TeamMembership.objects.filter(user=user, team=team).exists():
             return Response({'error': 'User is already a member of the team'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Add the user to the team
+        # Add the user to the team with specified role
         TeamMembership.objects.create(user=user, team=team, role=role)
 
-        # Send an email notification
+        # Send an email notification to invited user
         current_site = get_current_site(request)
         mail_subject = 'Team Invitation'
         message = f'Hi {user.name},\n\nYou have been added to the team {team.name} on SOPify.\n\nYou can now access the team and start collaborating.\n\nBest regards,\n{current_site.domain}'
@@ -135,7 +169,6 @@ class TeamViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_member_role(self, request, pk=None):
         """ Allow only the team owner to update a member’s role. """
-
 
         team = self.get_object()
 
@@ -353,9 +386,11 @@ class ListDriveFilesView(View):
         return JsonResponse({"files": files})
     
 class GoogleDriveUploadView(APIView):
+    """API endpoint for uploading documents to Google Drive."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """Handle POST request to upload a document to Google Drive."""
         try:
             # Get form data
             title = request.data.get('title')
@@ -365,283 +400,94 @@ class GoogleDriveUploadView(APIView):
             content_type = request.data.get('content_type')  # HTML or plain text
             review_date = request.data.get('review_date')
             
+            # Validate input
             if not title:
                 return Response({"error": "Title is required."}, status=status.HTTP_400_BAD_REQUEST)
             
             if not file_obj and not text_content:
                 return Response({"error": "You must provide either a file or text content."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Check if team exists if team_id is provided
-            team = None
-            if team_id:
-                try:
-                    team = Team.objects.get(id=team_id)
-                    # Verify user is a member of the team
-                    if not TeamMembership.objects.filter(team=team, user=request.user).exists():
-                        return Response(
-                            {"error": "You are not a member of this team"}, 
-                            status=status.HTTP_403_FORBIDDEN
-                        )
-                except Team.DoesNotExist:
-                    return Response(
-                        {"error": f"Team with ID {team_id} not found"}, 
-                        status=status.HTTP_404_NOT_FOUND
-                    )
+            # Check if the user belongs to the specified team
+            team, error_response = validate_team_membership(request.user, team_id)
+            if error_response:
+                return error_response
             
-            # Prepare Google Auth with PyDrive2
-            gauth = GoogleAuth()
-            gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
-            
-            # Load credentials stored in the session
+            # Get Google Drive credentials from session
             creds_json = request.session.get('google_drive_credentials')
             if not creds_json:
                 return Response({"error": "Not authenticated with Google Drive."}, status=status.HTTP_401_UNAUTHORIZED)
             
+            # Upload document to Google Drive using service class
             try:
-                credentials = OAuth2Credentials.from_json(creds_json)
-            except Exception as e:
-                logger.error("Failed to load Google Drive credentials: %s", e, exc_info=True)
-                return Response({"error": "Invalid Google Drive credentials."}, status=status.HTTP_400_BAD_REQUEST)
-            
-            gauth.credentials = credentials
-            drive = GoogleDrive(gauth)
-            
-            # Create file in Google Drive - don't specify mimeType yet
-            gfile = drive.CreateFile({'title': title})
-            
-            # Create a temporary file
-            temp_file = None
-            file_path = None
-            mime_type = 'text/plain'  # Default MIME type
-            
-            try:
-                if text_content:
-                    # For HTML content, write to a temporary HTML file
-                    if content_type == 'html':
-                        # Fix the HTML content structure
-                        html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>{title}</title>
-</head>
-<body>
-{text_content}
-</body>
-</html>"""
-                        
-                        # Use .html extension for HTML files
-                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
-                        temp_file.write(html_content.encode('utf-8'))
-                        temp_file.flush()
-                        file_path = temp_file.name
-                        mime_type = 'text/html'  # Set HTML MIME type
-                    else:
-                        # Plain text
-                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
-                        temp_file.write(text_content.encode('utf-8'))
-                        temp_file.flush()
-                        file_path = temp_file.name
-                        mime_type = 'text/plain'  # Set plain text MIME type
-                        
-                elif file_obj:
-                    # For a file upload, write to a temporary file
-                    suffix = '.' + file_obj.name.split('.')[-1].lower()
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-                    for chunk in file_obj.chunks():
-                        temp_file.write(chunk)
-                    temp_file.flush()
-                    file_path = temp_file.name
-                    
-                    # Determine MIME type based on file extension
-                    if suffix == '.docx':
-                        mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                    elif suffix == '.doc':
-                        mime_type = 'application/msword'
-                    elif suffix == '.pdf':
-                        mime_type = 'application/pdf'
-                    elif suffix == '.txt':
-                        mime_type = 'text/plain'
-                    elif suffix == '.html' or suffix == '.htm':
-                        mime_type = 'text/html'
-                    else:
-                        # Default to binary for unknown types
-                        mime_type = 'application/octet-stream'
-                
-                # Explicitly set the content file with the correct MIME type
-                gfile.SetContentFile(file_path)
-                gfile['mimeType'] = mime_type
-                
-            finally:
-                if temp_file:
-                    temp_file.close()
-            
-            # Upload with conversion enabled
-            max_attempts = 3
-            for attempt in range(max_attempts):
-                try:
-                    gfile.Upload({'convert': True})
-                    break
-                except Exception as upload_error:
-                    logger.error("Upload attempt %s failed: %s", attempt + 1, upload_error, exc_info=True)
-                    if attempt == max_attempts - 1:
-                        return Response({"error": f"Failed to upload file after {max_attempts} attempts: {str(upload_error)}"},
-                                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                    time.sleep(2)  # wait before retrying
-            
-            # After successful upload, convert to Google Docs format
-            try:
-                # Get the file ID
-                file_id = gfile['id']
-                
-                # Convert to Google Docs format by copying
-                url = f"https://www.googleapis.com/drive/v2/files/{file_id}/copy"
-                headers = {
-                    'Authorization': f'Bearer {credentials.access_token}',
-                    'Content-Type': 'application/json'
-                }
-                payload = {
-                    'title': title,
-                    'mimeType': 'application/vnd.google-apps.document'
-                }
-                
-                response = requests.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                
-                # Get the new file ID and delete the original file
-                result = response.json()
-                new_file_id = result.get('id')
-                
-                # Update gfile to point to the new converted file
-                if new_file_id:
-                    # Delete original file
-                    gfile.Delete()
-                    
-                    # Update to the new Google Doc
-                    gfile = drive.CreateFile({'id': new_file_id})
-                    drive_file_id = new_file_id
-                else:
-                    drive_file_id = gfile['id']
-            except Exception as e:
-                # If conversion fails, keep the original file
-                logger.warning("Failed to convert to Google Docs format: %s", e)
-                drive_file_id = gfile['id']
-            
-            # Insert permission to allow anyone to view the document
-            permission = {
-                'type': 'anyone',
-                'role': 'writer'
-            }
-            gfile.InsertPermission(permission)
-            
-            # Clean up the temporary file
-            if file_path:
-                try:
-                    os.remove(file_path)
-                except Exception as e:
-                    logger.warning("Could not remove temporary file: %s", e)
-            
-            # Retry fetching metadata up to max_attempts
-            file_url = None
-            for attempt in range(max_attempts):
-                try:
-                    time.sleep(2)  # Add a delay before fetching metadata
-                    gfile.FetchMetadata(fields='id, webViewLink, webContentLink, alternateLink, embedLink')
-                    
-                    # Try multiple fields that might contain the URL
-                    file_url = (gfile.get('webViewLink') or 
-                               gfile.get('alternateLink') or 
-                               gfile.get('embedLink'))
-                    
-                    logger.info("Attempt %s: Fetched file metadata: %s", attempt + 1, {
-                        'id': gfile.get('id'),
-                        'webViewLink': gfile.get('webViewLink'),
-                        'webContentLink': gfile.get('webContentLink'),
-                        'alternateLink': gfile.get('alternateLink'),
-                        'embedLink': gfile.get('embedLink')
-                    })
-                    
-                    if file_url:
-                        logger.info("Successfully found URL: %s", file_url)
-                        break
-                        
-                    # If webViewLink not available, manually construct the URL
-                    if not file_url and gfile.get('id'):
-                        file_url = f"https://docs.google.com/document/d/{gfile.get('id')}/edit"
-                        logger.info("Manually constructed URL: %s", file_url)
-                        break
-                except Exception as e:
-                    logger.error("Error fetching metadata: %s", e)
-                    
-                # If last attempt, try a different approach
-                if attempt == max_attempts - 1 and not file_url and gfile.get('id'):
-                    try:
-                        # Try direct API call to get sharing link
-                        url = f"https://www.googleapis.com/drive/v3/files/{gfile.get('id')}?fields=webViewLink"
-                        headers = {'Authorization': f'Bearer {credentials.access_token}'}
-                        response = requests.get(url, headers=headers)
-                        response.raise_for_status()
-                        data = response.json()
-                        file_url = data.get('webViewLink')
-                        logger.info("Retrieved URL via direct API: %s", file_url)
-                    except Exception as e:
-                        logger.error("Failed to retrieve URL via direct API: %s", e)
-                        # Last resort - construct URL manually
-                        file_url = f"https://docs.google.com/document/d/{gfile.get('id')}/edit"
-                        logger.info("Last resort manual URL: %s", file_url)
-
-            if not file_url and gfile.get('id'):
-                # If we still don't have a URL but have an ID, construct it
-                file_url = f"https://docs.google.com/document/d/{gfile.get('id')}/edit"
-                logger.warning("No URL from Google Drive API. Using constructed URL: %s", file_url)
-
-            if not file_url:
-                logger.error("No file URL could be generated from Google Drive.")
-                return Response({"error": "File URL not generated by Google Drive."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                drive_service = GoogleDriveService(creds_json)
+                result = drive_service.upload_document(
+                    title=title,
+                    text_content=text_content,
+                    file_obj=file_obj,
+                    content_type=content_type
+                )
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
             
             # Save metadata to database
             document = Document.objects.create(
                 title=title,
-                file_url=file_url,
-                google_drive_file_id=drive_file_id,
+                file_url=result['file_url'],
+                google_drive_file_id=result['file_id'],
                 owner=request.user,
                 team=team,
                 review_date=review_date if review_date else None
             )
             
+            # Return the created document data
             serializer = DocumentSerializer(document)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         except Exception as e:
+            # Log the error and return a server error response
             logger.error("Error in GoogleDriveUploadView: %s", e, exc_info=True)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GenerateSOPView(APIView):
+    """
+    API endpoint for generating SOPs using OpenAI GPT.
+    
+    Takes a user prompt and returns AI-generated SOP content.
+    Requires authentication.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """Handle POST request to generate an SOP using AI."""
+        # Get the prompt from the request data
         prompt = request.data.get('prompt')
         if not prompt:
             return Response({'error': 'Prompt is required.'}, status=400)
 
         try:
+            # Initialize OpenAI client with API key from settings
             client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
+            # Call the OpenAI API with SOP generation prompt
             completion = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "developer", "content": "You are an assistant that helps users write effective and clear Standard Operating Procedures (SOPs)."},
+                    # System message with SOP format instructions
+                    {"role": "developer", "content": GENERATION_PROMPT},
+                    # User's specific request
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.7,
-                max_tokens=1000
+                temperature=0.7, # Moderate creativity
+                max_tokens=1000 # Limit response length
             )
 
+            # Extract the generated text from the response
             sop_text = completion.choices[0].message.content
             return Response({"sop": sop_text})
 
         except Exception as e:
+             # Return error message if OpenAI API call fails
             return Response({"error": f"OpenAI error: {str(e)}"}, status=500)
 
 
@@ -805,18 +651,21 @@ class GoogleDriveFileContentView(APIView):
         return Response({"title":document.title, "content": content, "file_url": document.file_url}, status=200)
 
 class DocumentDeleteView(APIView):
+    """API endpoint for deleting documents."""
     permission_classes = [IsAuthenticated]
     
     def delete(self, request, document_id):
+        """Handle DELETE request to remove a document."""
+        # Get document or return 404
         document = get_object_or_404(Document, id=document_id)
         
-        # Check permissions
+        # Check permissions based of if team or personal document
         if document.team:
             try:
-                # Check if user is a member of this team
+                # For team documents, check if user is a member of this team
                 membership = TeamMembership.objects.get(team=document.team, user=request.user)
                 
-                # Only team owners or the document creator can delete
+                # Only team owners or the document creator can delete documents
                 if membership.role != 'owner' and document.owner != request.user:
                     return Response(
                         {'error': 'Only team owners or the document creator can delete team documents.'},
@@ -824,6 +673,7 @@ class DocumentDeleteView(APIView):
                     )
                     
             except TeamMembership.DoesNotExist:
+                # User is not a team member
                 return Response(
                     {'error': 'You are not a member of this team.'},
                     status=status.HTTP_403_FORBIDDEN
@@ -835,7 +685,7 @@ class DocumentDeleteView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # If we get here, user has permission to delete the document
+        # user has permission to delete the document
         try:
             # Delete from Google Drive
             gauth = GoogleAuth()
@@ -845,9 +695,11 @@ class DocumentDeleteView(APIView):
             
             # Delete from database
             document.delete()
-            
+
+            # Return success (204 No Content is standard for successful DELETE)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
+            # Return error response if deletion fails
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Update DocumentPermission class
@@ -856,9 +708,11 @@ class DocumentPermission(permissions.BasePermission):
     """Custom permission for document operations"""
     
     def has_permission(self, request, view):
+        """Check if the user is authenticated for any document operation"""
         return request.user.is_authenticated
     
     def has_object_permission(self, request, view, obj):
+        """Determine if the user has permission for the specific document."""
         # Check if user is the document owner
         if obj.owner == request.user:
             return True

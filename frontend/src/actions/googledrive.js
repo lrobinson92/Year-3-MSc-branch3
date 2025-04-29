@@ -11,7 +11,17 @@ import {
   GENERATE_SOP_FAIL,
   CHECK_DRIVE_AUTH_SUCCESS,
   CHECK_DRIVE_AUTH_FAIL,
-  GOOGLE_DRIVE_AUTH_FAIL
+  GOOGLE_DRIVE_AUTH_FAIL,
+  DELETE_DOCUMENT_SUCCESS,
+  DELETE_DOCUMENT_FAIL,
+  CREATE_DOCUMENT_SUCCESS,
+  CREATE_DOCUMENT_FAIL,
+  IMPROVE_SOP_START,
+  IMPROVE_SOP_SUCCESS,
+  IMPROVE_SOP_FAIL,
+  SUMMARIZE_SOP_START,
+  SUMMARIZE_SOP_SUCCESS,
+  SUMMARIZE_SOP_FAIL
 } from './types';
 
 // New action to check Google Drive authentication status
@@ -160,6 +170,147 @@ export const setDriveLoggedIn = (status) => dispatch => {
         type: SET_DRIVE_LOGGED_IN,
         payload: status
     });
+};
+
+// Action to delete a document
+export const deleteDocument = (documentId) => async dispatch => {
+  try {
+    // Confirm deletion
+    if (!window.confirm('Are you sure you want to delete this document?')) {
+      return false;
+    }
+    
+    // Delete document via API
+    await axiosInstance.delete(
+      `${process.env.REACT_APP_API_URL}/api/documents/${documentId}/`, 
+      { withCredentials: true }
+    );
+    
+    // Dispatch success
+    dispatch({
+      type: DELETE_DOCUMENT_SUCCESS,
+      payload: documentId // Include the ID so we can filter it out in the reducer
+    });
+    
+    return true; // Return success status
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    
+    // Dispatch failure
+    dispatch({
+      type: DELETE_DOCUMENT_FAIL,
+      payload: error.response?.data || 'Failed to delete document'
+    });
+    
+    return false; // Return failure status
+  }
+};
+
+// Action to create a new document in Google Drive
+export const createDocument = (documentData) => async (dispatch) => {
+  const { title, textContent, teamId, reviewDate, setReviewReminder } = documentData;
+  
+  // Create FormData object for the request
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('text_content', textContent);
+  formData.append('content_type', 'html');
+  
+  // Add optional fields if present
+  if (teamId) {
+    formData.append('team_id', teamId);
+  }
+  
+  if (setReviewReminder && reviewDate) {
+    formData.append('review_date', reviewDate);
+  }
+  
+  try {
+    // Send request to create document
+    const response = await axiosInstance.post(
+      `${process.env.REACT_APP_API_URL}/api/google-drive/upload/`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        withCredentials: true,
+      }
+    );
+    
+    // Dispatch success action
+    dispatch({
+      type: CREATE_DOCUMENT_SUCCESS,
+      payload: response.data
+    });
+    
+    return { success: true, data: response.data };
+  } catch (error) {
+    // Dispatch failure action
+    dispatch({
+      type: CREATE_DOCUMENT_FAIL,
+      payload: error.response?.data || 'Failed to create document'
+    });
+    
+    return { success: false, error: error.response?.data || 'Failed to create document' };
+  }
+};
+
+// Action to improve an SOP document using AI
+export const improveSOP = (content) => async (dispatch) => {
+  dispatch({ type: IMPROVE_SOP_START });
+  
+  try {
+    const response = await axiosInstance.post(
+      '/api/improve-sop/',
+      { content },
+      { withCredentials: true }
+    );
+    
+    const improvedHtml = formatMarkdownToHTML(response.data.improved);
+    
+    dispatch({
+      type: IMPROVE_SOP_SUCCESS,
+      payload: {
+        originalContent: content,
+        improvedContent: improvedHtml
+      }
+    });
+    
+    return { success: true, originalContent: content, improvedContent: improvedHtml };
+  } catch (error) {
+    dispatch({
+      type: IMPROVE_SOP_FAIL,
+      payload: error.response?.data || 'Could not improve SOP'
+    });
+    
+    return { success: false, error: error.response?.data || 'Could not improve SOP' };
+  }
+};
+
+// Action to summarize an SOP document using AI
+export const summarizeSOP = (content) => async (dispatch) => {
+  dispatch({ type: SUMMARIZE_SOP_START });
+  
+  try {
+    const response = await axiosInstance.post(
+      '/api/summarise-sop/',
+      { content },
+      { withCredentials: true }
+    );
+    
+    dispatch({
+      type: SUMMARIZE_SOP_SUCCESS,
+      payload: response.data.summary
+    });
+    
+    return { success: true, summary: response.data.summary };
+  } catch (error) {
+    dispatch({
+      type: SUMMARIZE_SOP_FAIL,
+      payload: error.response?.data || 'Could not summarize SOP'
+    });
+    
+    return { success: false, error: error.response?.data || 'Could not summarize SOP' };
+  }
 };
 
 

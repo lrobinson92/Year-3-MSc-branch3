@@ -17,7 +17,7 @@ SOPify is a comprehensive SOP (Standard Operating Procedure) management system d
 - PostgreSQL (v13+)
 - Google OAuth credentials
 
-## 🔧 Installation
+## Installation
 
 ### Backend Setup
 
@@ -72,7 +72,7 @@ npm start
    - `http://localhost:8000/api/google-drive/callback/` (development)
 5. Update your `.env` file with the client ID and client secret
 
-## 🔑 Environment Variables
+## Environment Variables
 
 ### Backend (.env)
 
@@ -91,7 +91,7 @@ OPENAI_API_KEY=your_openai_api_key
 REACT_APP_API_URL=http://localhost:8000/api
 ```
 
-## 📚 API Documentation
+## API Documentation
 
 ### Teams API
 - `GET /teams/` - List all teams
@@ -130,7 +130,7 @@ REACT_APP_API_URL=http://localhost:8000/api
 - `DELETE /documents/{document_id}/delete/` - Delete a document from Google Drive
 
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 SOPify uses a modern web application architecture:
 
@@ -143,7 +143,7 @@ SOPify uses a modern web application architecture:
   
 The system follows a modular approach with separate components for authentication, document management, team management, and task tracking.
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run backend tests

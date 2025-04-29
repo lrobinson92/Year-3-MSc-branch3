@@ -17,13 +17,17 @@ import {
     EDIT_TASK_SUCCESS,
     EDIT_TASK_FAIL,
     DELETE_TASK_SUCCESS,
-    DELETE_TASK_FAIL
+    DELETE_TASK_FAIL,
+    FETCH_TEAM_MEMBERS_SUCCESS,
+    FETCH_TEAM_MEMBERS_FAIL
 } from '../actions/types';
 
 const initialState = {
     tasks: [],
     userTasks: [],
     teamTasks: [],
+    teamMembers: [],
+    isTeamOwner: false,
     currentTask: null,
     loading: false,
     error: null
@@ -120,6 +124,23 @@ function taskReducer(state = initialState, action) {
                 teamTasks: state.teamTasks.filter(task => task.id !== payload),
                 loading: false,
                 error: null
+            };
+            
+        case FETCH_TEAM_MEMBERS_SUCCESS:
+            return {
+                ...state,
+                teamMembers: payload.teamMembers || [],
+                isTeamOwner: payload.isOwner || false,
+                loading: false,
+                error: null
+            };
+            
+        case FETCH_TEAM_MEMBERS_FAIL:
+            return {
+                ...state,
+                teamMembers: [],
+                loading: false,
+                error: payload
             };
             
         case TASK_DETAILS_FAIL:

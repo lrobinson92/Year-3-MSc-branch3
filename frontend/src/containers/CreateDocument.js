@@ -1,65 +1,105 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
-import axiosInstance from '../utils/axiosConfig';
-import { formatMarkdownToHTML } from '../utils/utils';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { uploadDocument, generateSOP } from '../actions/googledrive';
+import { 
+  uploadDocument, 
+  generateSOP, 
+  createDocument, 
+  improveSOP, 
+  summarizeSOP 
+} from '../actions/googledrive';
+import { fetchTeams } from '../actions/team';
 import { FaArrowLeft, FaCalendarAlt } from 'react-icons/fa';
 import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
-import htmlDocx from 'html-docx-js/dist/html-docx';
-import '../globalStyles.css'; // Ensure the global styles are imported
+import '../globalStyles.css';
 
-const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) => {
+/**
+ * CreateDocument Component - A form for creating new SOPs with various input methods
+ * Provides document editing with AI assistance and team assignment capabilities
+ */
+const CreateDocument = ({ 
+  isAuthenticated, 
+  user, 
+  teams,
+  uploadDocument, 
+  generateSOP, 
+  createDocument,
+  improveSOP,
+  summarizeSOP,
+  driveLoggedIn,
+  fetchTeams,
+  improvingSOP,
+  summarizingSOP,
+  summary,
+  originalContent,
+  improvedContent,
+  error: reduxError
+}) => {
+  // Document information state
   const [title, setTitle] = useState('');
   const [teamId, setTeamId] = useState('');
-  const [teams, setTeams] = useState([]);
   const [prompt, setPrompt] = useState('');
   const [inputType, setInputType] = useState('');
   const [textContent, setTextContent] = useState('');
   const [error, setError] = useState('');
+  
+  // UI state management
   const [generating, setGenerating] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [summary, setSummary] = useState('');
-  const [summarising, setSummarising] = useState(false);
-  const [improving, setImproving] = useState(false);
-  const [originalContent, setOriginalContent] = useState('');
-  const [improvedContent, setImprovedContent] = useState('');
   const [showingPreview, setShowingPreview] = useState(false);
   const [creating, setCreating] = useState(false);
+  
+  // Review reminder settings
   const [reviewDate, setReviewDate] = useState('');
   const [setReviewReminder, setSetReviewReminder] = useState(false);
-  const [driveLoggedIn, setDriveLoggedIn] = useState(false);
 
+  // References to DOM elements
   const quillRef = useRef(null);
   const fileInputRef = useRef(null);
-
   const navigate = useNavigate();
 
+  /**
+   * Redirects to Google Drive authentication when the user needs to connect
+   */
   const handleGDriveAuth = () => {
     redirectToGoogleDriveLogin('/create-document');
   };
 
-  // Optionally fetch teams that the user belongs to so they can choose which team this document is for.
+  /**
+   * Load teams when component mounts
+   */
   useEffect(() => {
-    const fetchTeams = async () => {
-      try {
-        const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/`, {
-          withCredentials: true,
-        });
-        setTeams(res.data);
-      } catch (err) {
-        console.error(err);
-        setError('Failed to fetch teams.');
-      }
-    };
     fetchTeams();
-  }, []);
+  }, [fetchTeams]);
 
+  /**
+   * Display any errors from Redux state
+   */
+  useEffect(() => {
+    if (reduxError) {
+      setError(reduxError);
+    }
+  }, [reduxError]);
+
+  /**
+   * Show preview when improved content becomes available
+   */
+  useEffect(() => {
+    if (improvedContent && originalContent) {
+      setShowingPreview(true);
+    }
+  }, [improvedContent, originalContent]);
+
+  /**
+   * Handles form submission to create a new document
+   * Validates inputs and sends data to the server
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Input validation
     if (!title) {
       setError('Title is required.');
       return;
@@ -70,173 +110,123 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
       return;
     }
 
+    // Show loading state during creation
     setCreating(true);
     
-    const formData = new FormData();
-    formData.append('title', title);
+    // Call Redux action to create the document
+    const result = await createDocument({
+      title,
+      textContent,
+      teamId,
+      reviewDate,
+      setReviewReminder
+    });
     
-    if (teamId) {
-      formData.append('team_id', teamId);
-    }
-    
-    formData.append('text_content', textContent);
-    formData.append('content_type', 'html'); // Add this to tell backend it's HTML
-    
-    if (setReviewReminder && reviewDate) {
-      formData.append('review_date', reviewDate);
-    }
-
-    try {
-      await axiosInstance.post(
-        `${process.env.REACT_APP_API_URL}/api/google-drive/upload/`,
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          withCredentials: true,
-        }
-      );
+    // Handle response from server
+    if (result.success) {
       navigate('/view/documents');
-    } catch (err) {
-      console.error('Error creating document:', err);
-      setError('Failed to create document.');
-    } finally {
-      setCreating(false);
+    } else {
+      setError(result.error);
     }
+    
+    setCreating(false);
   };
 
+  /**
+   * Handles file upload functionality
+   * Sends file to server for processing and updates editor with content
+   */
   const handleFileUpload = (e) => {
-    // Hide any existing preview
+    // Reset preview states when a new file is uploaded
     setShowingPreview(false);
-    setOriginalContent('');
-    setImprovedContent('');
-
-    // Reset summary as well
-    setSummary('');
-
+    
     const file = e.target.files[0];
     if (!file) return;
 
-    // reset the file input so same file can be selected again
+    // Clear file input after selection to allow selecting the same file again
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
 
     setSelectedFile(file);
+    // Process file and update text content
     uploadDocument(file, title, setTextContent, setError, setInputType);
   };
 
+  /**
+   * Generates an SOP using OpenAI based on user prompt
+   * Updates the editor with the generated content
+   */
   const handleGenerateSOP = () => {
-    // Hide any existing preview
+    // Reset preview when generating new content
     setShowingPreview(false);
-    setOriginalContent('');
-    setImprovedContent('');
-
-    // Reset summary as well
-    setSummary('');
-
+    
+    // Call Redux action to generate an SOP
     generateSOP(prompt, quillRef, setTextContent, setInputType, setGenerating, setError);
   };
 
+  /**
+   * Sends current SOP content to AI for improvement
+   */
   const handleImproveSOP = async () => {
-    // Hide any existing summary
-    setSummary('');
-
-    // Reset existing preview (if any)
-    setShowingPreview(false);
-    setOriginalContent('');
-    setImprovedContent('');
-
-    setImproving(true);
-    try {
-      // Store the original content before improving
-      setOriginalContent(textContent);
-
-      const res = await axiosInstance.post(
-        '/api/improve-sop/',
-        { content: textContent },
-        { withCredentials: true }
-      );
-
-      // Store the improved content
-      const improvedHtml = formatMarkdownToHTML(res.data.improved);
-      setImprovedContent(improvedHtml);
-
-      // Show the preview instead of directly applying changes
-      setShowingPreview(true);
-    } catch (err) {
-      console.error(err);
-      setError('Could not improve SOP.');
-    } finally {
-      setImproving(false);
-    }
+    improveSOP(textContent);
   };
 
+  /**
+   * Applies the AI-improved content to the editor
+   */
   const acceptImprovedSOP = () => {
-    // Apply the improved content
+    // Update editor with improved content
     const quill = quillRef.current.getEditor();
-
-    // Clear existing content
     quill.setText('');
-
-    // Insert the HTML directly at position 0 (beginning of editor)
     quill.clipboard.dangerouslyPasteHTML(0, improvedContent);
     setTextContent(improvedContent);
-
-    // Reset the preview state
+    
+    // Hide preview after accepting changes
     setShowingPreview(false);
-    setOriginalContent('');
-    setImprovedContent('');
   };
 
+  /**
+   * Discards AI improvements and keeps original content
+   */
   const discardImprovedSOP = () => {
-    // Keep the original content
-    // No need to update the editor since we never changed it
-
-    // Reset the preview state
     setShowingPreview(false);
-    setOriginalContent('');
-    setImprovedContent('');
   };
 
+  /**
+   * Sends current SOP to AI for summarization
+   */
   const handleSummariseSOP = async () => {
-    // Hide any existing preview
     setShowingPreview(false);
-    setOriginalContent('');
-    setImprovedContent('');
-
-    setSummarising(true);
-    try {
-      const res = await axiosInstance.post(
-        '/api/summarise-sop/',
-        { content: textContent },
-        { withCredentials: true }
-      );
-      setSummary(res.data.summary);
-    } catch (err) {
-      console.error(err);
-      setError('Could not summarise SOP.');
-    } finally {
-      setSummarising(false);
-    }
+    
+    summarizeSOP(textContent);
   };
 
+  /**
+   * Navigates back to previous page
+   */
   const handleGoBack = () => {
-    navigate(-1); // This navigates back one step in history
+    navigate(-1);
   };
 
   return (
     <div className="container mt-5 entry-container">
+      {/* Back button for navigation */}
       <FaArrowLeft
         className="back-arrow"
         onClick={handleGoBack}
         style={{ cursor: 'pointer' }}
         title="Go back to previous page"
       />
+
+      {/* Main document creation card */}
       <div className="card create-document-card p-4 w-100" style={{ maxWidth: '1200px' }}>
         <h4 className="mb-4">Create Document</h4>
 
+        {/* Error display area */}
         {error && <div className="alert alert-danger">{error}</div>}
 
+        {/* Document title input */}
         <div className="mb-4">
           <input
             type="text"
@@ -247,6 +237,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           />
         </div>
 
+        {/* Team selection dropdown */}
         <div className="mb-4">
           <select
             id="teamSelect"
@@ -263,7 +254,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           </select>
         </div>
 
-        {/* Review Date Section */}
+        {/* Review reminder section */}
         <div className="mb-4 border rounded p-3 bg-light-subtle" style={{ padding: '1rem' }}>
           <div className="form-check mb-2">
             <input
@@ -278,6 +269,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
             </label>
           </div>
 
+          {/* Conditional review date picker */}
           {setReviewReminder && (
             <div className="mt-2">
               <label htmlFor="reviewDate" className="form-label">Review Date</label>
@@ -287,7 +279,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                 id="reviewDate"
                 value={reviewDate}
                 onChange={(e) => setReviewDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={new Date().toISOString().split('T')[0]}  // Ensures dates in the past can't be selected
               />
               <div className="form-text text-muted">
                 A reminder will be sent 14 days before the review date.
@@ -296,10 +288,13 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           )}
         </div>
 
+        {/* AI-powered SOP creation section */}
         <div className="border rounded p-3 mb-4 bg-light-subtle" style={{ padding: '1.5rem' }}>
           <p className="fw-semibold mb-2">
             <span role="img" aria-label="spark">✨</span> Create an SOP with AI
           </p>
+          
+          {/* AI prompt input */}
           <textarea
             className="form-control mb-2"
             rows="2"
@@ -307,7 +302,10 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
+          
+          {/* File upload and AI action buttons */}
           <div className="d-flex align-items-center gap-2 flex-wrap">
+            {/* File upload button */}
             <label htmlFor="fileUpload" className="btn btn-outline-primary btn-sm flex-grow-0">
               Choose File
             </label>
@@ -319,6 +317,8 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
               accept=".docx,.txt"
               style={{ display: 'none' }}
             />
+            
+            {/* Display selected file information */}
             {selectedFile && (
               <div className="d-flex align-items-center gap-2 mt-2">
                 <span className="text-muted">Selected File: {selectedFile.name}</span>
@@ -336,10 +336,15 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                 </button>
               </div>
             )}
+            
+            {/* AI action buttons */}
             <div className="ms-auto d-flex gap-2">
+              {/* Generate SOP button */}
               <button className="btn btn-primary btn-sm flex-grow-0" onClick={handleGenerateSOP} disabled={generating}>
                 {generating ? 'Generating...' : 'Generate SOP'}
               </button>
+              
+              {/* AI actions dropdown menu */}
               <div className="dropdown">
                 <button
                   className="btn btn-outline-secondary btn-sm dropdown-toggle flex-grow-0"
@@ -365,26 +370,27 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
             </div>
           </div>
 
-          {/* Spinner for Improving SOP */}
-          {improving && (
+          {/* Loading indicators for AI operations */}
+          {improvingSOP && (
             <div className="mt-3 text-muted d-flex align-items-center gap-2">
               <div className="spinner-border spinner-border-sm text-secondary" role="status" />
               <span>Improving SOP...</span>
             </div>
           )}
-          {summarising && (
+          {summarizingSOP && (
             <div className="mt-3 text-muted d-flex align-items-center gap-2">
               <div className="spinner-border spinner-border-sm text-secondary" role="status" />
               <span>Summarising SOP...</span>
             </div>
           )}
 
-          {/* Summary Alert Section */}
+          {/* Summary display and insertion controls */}
           {summary && (
             <div className="alert alert-info mt-4">
               <h6>📄 Summary</h6>
               <p style={{ whiteSpace: 'pre-wrap' }}>{summary}</p>
               <div className="d-flex gap-2 mt-2">
+                {/* Button to insert summary at top of document */}
                 <button
                   className="btn btn-outline-primary btn-sm"
                   onClick={() => {
@@ -392,14 +398,13 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                     const summaryDelta = quill.clipboard.convert(`<h2>Summary:</h2><p>${summary}</p><br/><br/>`);
                     const current = quill.getContents();
                     quill.setContents([...summaryDelta.ops, ...current.ops]);
-                    setSummary('');
                   }}
                 >
                   Insert at Top
                 </button>
                 <button
                   className="btn btn-outline-secondary btn-sm"
-                  onClick={() => setSummary('')}
+                  onClick={() => {}}
                 >
                   Dismiss
                 </button>
@@ -408,19 +413,21 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           )}
         </div>
 
-        {/* Improved SOP Preview */}
+        {/* Improved SOP preview section */}
         {showingPreview && improvedContent && (
           <div className="mt-4 mb-4">
             <div className="alert alert-info">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="mb-0">✨ Improved SOP Preview</h6>
                 <div className="d-flex gap-2">
+                  {/* Accept improved content button */}
                   <button
                     className="btn btn-success btn-sm"
                     onClick={acceptImprovedSOP}
                   >
                     Accept Changes
                   </button>
+                  {/* Discard improved content button */}
                   <button
                     className="btn btn-outline-secondary btn-sm"
                     onClick={discardImprovedSOP}
@@ -430,6 +437,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
                 </div>
               </div>
 
+              {/* Preview content display */}
               <div className="border rounded p-3 bg-white" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                 <div dangerouslySetInnerHTML={{ __html: improvedContent }} />
               </div>
@@ -437,6 +445,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           </div>
         )}
 
+        {/* Google Drive authentication prompt */}
         {!driveLoggedIn && (
           <button 
             className="btn btn-primary" 
@@ -446,6 +455,7 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           </button>
         )}
 
+        {/* Rich text editor for document content */}
         <div className="mb-4" style={{ marginBottom: '2rem' }}>
           <ReactQuill
             ref={quillRef}
@@ -475,11 +485,12 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
           />
         </div>
 
+        {/* Form submission button */}
         <div className="text-end mt-5 mb-2">
           <button
             className="btn btn-success px-4"
             onClick={handleSubmit}
-            disabled={creating} // Disable button while creating
+            disabled={creating}
           >
             {creating ? (
               <>
@@ -496,9 +507,26 @@ const CreateDocument = ({ isAuthenticated, user, uploadDocument, generateSOP }) 
   );
 };
 
+/**
+ * Map Redux state to component props
+ */
 const mapStateToProps = (state) => ({
   isAuthenticated: state.auth.isAuthenticated,
   user: state.auth.user,
+  teams: state.team.teams,
+  driveLoggedIn: state.googledrive.driveLoggedIn,
+  improvingSOP: state.googledrive.improvingSOP,
+  summarizingSOP: state.googledrive.summarizingSOP,
+  summary: state.googledrive.summary,
+  originalContent: state.googledrive.originalContent,
+  improvedContent: state.googledrive.improvedContent,
+  error: state.googledrive.error
 });
 
-export default connect(mapStateToProps, { uploadDocument, generateSOP })(CreateDocument);
+/**
+ * Connect component to Redux store with actions and state
+ */
+export default connect(
+  mapStateToProps, 
+  { uploadDocument, generateSOP, createDocument, improveSOP, summarizeSOP, fetchTeams }
+)(CreateDocument);

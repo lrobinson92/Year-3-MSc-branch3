@@ -7,6 +7,7 @@ import { resetFirstLogin } from '../actions/auth';
 import { connect } from 'react-redux';
 import axiosInstance from '../utils/axiosConfig';
 import { FaFileAlt, FaTasks, FaUsers, FaPlus, FaBell, FaClock } from 'react-icons/fa';
+import { formatDate } from '../utils/utils';
 
 const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
     const [tasks, setTasks] = useState([]);
@@ -24,6 +25,23 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
     // Define brand colors for consistency
     const brandPurple = '#111049';
     const brandLightPurple = '#615fd8';
+
+    // Add these helper functions near the top of your Dashboard component
+    const isPastDue = (dueDate) => {
+        if (!dueDate) return false;
+        const now = new Date();
+        const due = new Date(dueDate);
+        return due < now;
+    };
+
+    const isComingSoon = (dueDate) => {
+        if (!dueDate) return false;
+        const due = new Date(dueDate);
+        const now = new Date();
+        const diffTime = due - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 0 && diffDays <= 7;
+    };
 
     useEffect(() => {
         if (firstLogin) {
@@ -281,7 +299,7 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                                             <td className="align-middle">
                                                                 {doc.review_date ? (
                                                                     <div className="small text-muted">
-                                                                        Review: {new Date(doc.review_date).toLocaleDateString()}
+                                                                        Review: {formatDate(doc.review_date)}
                                                                     </div>
                                                                 ) : (
                                                                     <div className="small text-muted">
@@ -291,7 +309,7 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                                             </td>
                                                             <td className="align-middle">
                                                                 <div className="small text-muted">
-                                                                    {new Date(doc.updated_at || doc.created_at).toLocaleDateString()}
+                                                                    {formatDate(doc.updated_at || doc.created_at)}
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -369,8 +387,15 @@ const Dashboard = ({ isAuthenticated, firstLogin, resetFirstLogin, user }) => {
                                                                 <span>
                                                                     {task.team_name ? `Team: ${task.team_name}` : "Personal"}
                                                                 </span>
-                                                                <span>
-                                                                    Due: {new Date(task.due_date).toLocaleDateString()}
+                                                                <span className="d-flex align-items-center">
+                                                                    Due: {formatDate(task.due_date)}
+                                                                    {isPastDue(task.due_date) && task.status !== 'complete' ? (
+                                                                        <span className="badge bg-danger ms-2 text-white" style={{ fontSize: '0.65rem' }}>Overdue</span>
+                                                                    ) : (
+                                                                        isComingSoon(task.due_date) && task.status !== 'complete' && (
+                                                                            <span className="badge bg-warning ms-2 text-dark" style={{ fontSize: '0.65rem' }}>Due soon</span>
+                                                                        )
+                                                                    )}
                                                                 </span>
                                                             </div>
                                                         </div>
