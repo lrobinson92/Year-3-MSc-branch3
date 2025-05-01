@@ -6,24 +6,42 @@ import Sidebar from '../components/Sidebar';
 import DocumentGrid from '../components/DocumentGrid';
 import GoogleDriveAuthCheck from '../components/GoogleDriveAuthCheck';
 import axiosInstance from '../utils/axiosConfig';
-import { googleDriveLogin, uploadDocument, setDocuments, setDriveLoggedIn } from '../actions/googledrive';
-import { FaTrash, FaEdit, FaLock } from 'react-icons/fa';
+import { setDocuments, setDriveLoggedIn } from '../actions/googledrive';
+import { FaTrash } from 'react-icons/fa';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 
-const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn, documents, setDocuments, setDriveLoggedIn }) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+/**
+ * ViewDocuments Component
+ * 
+ * Displays all documents available to the current user, organized by:
+ * - Personal documents (owned by the current user)
+ * - Team documents (grouped by team)
+ * 
+ * Requires Google Drive authentication to view and manage documents.
+ * Provides document deletion functionality with permission checks.
+ */
+const ViewDocuments = ({ isAuthenticated, user, driveLoggedIn, documents, setDocuments }) => {
+  // UI state
+  const [loading, setLoading] = useState(true);          // Loading indicator
+  const [error, setError] = useState(null);              // Error message
+  
+  // Document organization state
   const [sortedDocuments, setSortedDocuments] = useState({
     personal: [],
-    teams: {} // Object with team IDs as keys and arrays of documents as values
+    teams: {}                                            // Object with team IDs as keys and document arrays as values
   });
+  
+  // Document deletion state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
 
-  // Check if we should redirect to view a document after authentication
+  /**
+   * Handle pending document view after Google Drive authentication
+   * If user was trying to view a document before authenticating, redirect them afterward
+   */
   useEffect(() => {
     if (driveLoggedIn) {
       const pendingDocId = sessionStorage.getItem('pendingDocumentView');
@@ -34,7 +52,10 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     }
   }, [driveLoggedIn]);
 
-  // Fetch documents once authenticated with Drive
+  /**
+   * Fetch all documents once authenticated with Google Drive
+   * Updates the documents state in Redux store
+   */
   useEffect(() => {
     if (!driveLoggedIn) return;
 
@@ -46,7 +67,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
         );
         setDocuments(res.data);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching documents:', err);
         setError('Failed to fetch documents.');
       } finally {
         setLoading(false);
@@ -56,13 +77,17 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     fetchDocuments();
   }, [driveLoggedIn, setDocuments]);
 
-  // Sort documents by personal and team
+  /**
+   * Sort and organize documents by personal and team ownership
+   * Documents are sorted by last updated date (newest first)
+   */
   useEffect(() => {
     if (!documents) return;
 
     const personal = [];
     const teams = {};
 
+    // Categorize documents
     documents.forEach(doc => {
       if (doc.team) {
         // Team document
@@ -79,19 +104,26 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
       }
     });
 
-    // Sort each document array by newest first
+    // Sort personal documents by newest first
     personal.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
     
+    // Sort team documents by newest first
     Object.keys(teams).forEach(teamId => {
       teams[teamId].documents.sort((a, b) => 
-        new Date(b.updated_at || b.created_at) - Date(a.updated_at || a.created_at)
+        new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
       );
     });
 
     setSortedDocuments({ personal, teams });
   }, [documents]);
 
-  // Check if user can delete document
+  /**
+   * Check if current user has permission to delete a document
+   * Returns true if user is document owner or team owner
+   * 
+   * @param {object} document - The document to check permissions for
+   * @returns {boolean} Whether the user can delete the document
+   */
   const canDeleteDocument = (document) => {
     if (!user) return false;
     
@@ -107,14 +139,22 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     return false;
   };
 
-  // Handle delete button click
+  /**
+   * Handle delete button click
+   * Sets up the document deletion modal
+   * 
+   * @param {object} document - The document to be deleted
+   */
   const handleDeleteClick = (document) => {
     setDocumentToDelete(document);
     setShowDeleteModal(true);
     setDeleteError(null);
   };
 
-  // Handle confirming document deletion
+  /**
+   * Handle document deletion confirmation
+   * Sends delete request to API and updates UI on success
+   */
   const handleConfirmDelete = async () => {
     if (!documentToDelete) return;
     
@@ -138,19 +178,24 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
     }
   };
 
-  // Document action handlers for DocumentGrid
+  // Document action handlers passed to DocumentGrid component
   const documentActions = {
     onDelete: handleDeleteClick,
     canDelete: canDeleteDocument
   };
 
+  // Redirect to login if not authenticated
   if (!isAuthenticated) return <Navigate to="/login" />;
 
   return (
     <div className="d-flex">
+      {/* Sidebar navigation */}
       <Sidebar />
+      
+      {/* Main content area */}
       <div className="main-content">
         <div className="recent-items-card">
+          {/* Header with create button */}
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h2 data-testid="documents-heading">All Documents</h2>
             {driveLoggedIn && (
@@ -164,9 +209,10 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
             )}
           </div>
 
-          {/* Only prompt for Google Drive auth if not already logged in */}
+          {/* Google Drive authentication check wrapper */}
           <GoogleDriveAuthCheck showPrompt={!driveLoggedIn}>
             {loading ? (
+              /* Loading indicator */
               <div className="text-center p-5">
                 <div className="spinner-border text-primary" role="status">
                   <span className="visually-hidden">Loading...</span>
@@ -174,6 +220,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
                 <p className="mt-3">Loading documents...</p>
               </div>
             ) : error ? (
+              /* Error message */
               <div className="alert alert-danger">{error}</div>
             ) : (
               <>
@@ -190,7 +237,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
                   />
                 </div>
                 
-                {/* Team Documents Sections */}
+                {/* Team Documents Sections - One section per team */}
                 {Object.keys(sortedDocuments.teams).length > 0 ? (
                   Object.keys(sortedDocuments.teams).map(teamId => (
                     <div className="mb-5" key={teamId}>
@@ -207,6 +254,7 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
                     </div>
                   ))
                 ) : (
+                  /* Shown when user has no team documents */
                   <div className="mb-5">
                     <h3 className="mb-3">Team Documents</h3>
                     <p className="text-muted">You don't have any team documents yet.</p>
@@ -248,6 +296,10 @@ const ViewDocuments = ({ isAuthenticated, googleDriveLogin, user, driveLoggedIn,
   );
 };
 
+/**
+ * Maps Redux state to component props
+ * Provides authentication status, user details, and document data
+ */
 const mapStateToProps = (state) => ({
   isAuthenticated: state.auth.isAuthenticated,
   user: state.auth.user,
@@ -255,9 +307,10 @@ const mapStateToProps = (state) => ({
   documents: state.googledrive.documents,
 });
 
+/**
+ * Connect component to Redux store
+ */
 export default connect(mapStateToProps, {
-  googleDriveLogin,
-  uploadDocument,
   setDocuments,
   setDriveLoggedIn,
 })(ViewDocuments);

@@ -2,10 +2,29 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { FaEye, FaEdit, FaTrash, FaEllipsisV } from 'react-icons/fa';
-import { Dropdown } from 'react-bootstrap';
+import { Dropdown, Toast, ToastContainer } from 'react-bootstrap';
 import { deleteDocument } from '../actions/googledrive';
 import CustomToggle from '../utils/customToggle';
 
+/**
+ * DocumentGrid Component
+ * 
+ * Displays a responsive grid of document cards with actions like view, edit, and delete.
+ * Supports custom display options and integration with Google Drive.
+ * 
+ * @param {Object} props - Component properties
+ * @param {Array} props.documents - List of document objects to display
+ * @param {string} props.emptyMessage - Message to show when no documents exist
+ * @param {number} props.limit - Optional limit for number of documents to show
+ * @param {boolean} props.showCreateButton - Whether to show document creation button
+ * @param {string|number} props.teamId - Optional team ID for filtering documents
+ * @param {boolean} props.showTeamName - Whether to display team name on document cards
+ * @param {string} props.cardClass - CSS class for document cards
+ * @param {Function} props.onDocumentClick - Custom handler for document clicks
+ * @param {boolean} props.driveLoggedIn - Whether user is authenticated with Google Drive
+ * @param {Object} props.actions - Custom action handlers and permission checks
+ * @param {Function} props.deleteDocument - Redux action for deleting documents
+ */
 const DocumentGrid = ({ 
   documents,
   emptyMessage = "No documents available", 
@@ -17,31 +36,55 @@ const DocumentGrid = ({
   onDocumentClick = null,
   driveLoggedIn = true,
   actions = {},
-  deleteDocument // Added from Redux
+  deleteDocument
 }) => {
+  // Hook for programmatic navigation
   const navigate = useNavigate();
   
-  // Handle document deletion
+  // State for toast notification
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  
+  /**
+   * Handle document deletion with confirmation
+   * Uses either custom handler from props or Redux action
+   * 
+   * @param {Event} e - Click event
+   * @param {Object} doc - Document to delete
+   */
   const handleDeleteDocument = async (e, doc) => {
-    e.stopPropagation(); // Prevent triggering row click
+    e.stopPropagation(); // Prevent triggering document click event
+    
+    // User confirmation before deletion
+    if (!window.confirm(`Are you sure you want to delete "${doc.title || doc.name}"?`)) {
+      return;
+    }
     
     // If actions provides a custom delete handler, use that
     if (actions.onDelete) {
       actions.onDelete(doc);
+      // Show toast notification for custom handler too
+      setToastMessage(`"${doc.title || doc.name}" has been deleted`);
+      setShowToast(true);
       return;
     }
     
     // Otherwise use the Redux action
     const success = await deleteDocument(doc.id);
     
-    // Display success or failure notification
     if (success) {
-      // You could add a toast notification here
-      console.log("Document deleted successfully");
+      // Show toast notification for successful deletion
+      setToastMessage(`"${doc.title || doc.name}" has been deleted`);
+      setShowToast(true);
     }
   };
 
-  // Format display date
+  /**
+   * Format dates for display in a consistent format
+   * 
+   * @param {string} dateString - ISO date string
+   * @returns {string} Formatted date string
+   */
   const formatDate = (dateString) => {
     if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString();
@@ -50,7 +93,12 @@ const DocumentGrid = ({
   // Limit documents if specified
   const displayDocs = limit ? documents.slice(0, limit) : documents;
   
-  // Handle document click
+  /**
+   * Handle document click event
+   * Navigates to document view or calls custom handler
+   * 
+   * @param {Object} doc - Document object
+   */
   const handleDocumentClick = (doc) => {
     if (onDocumentClick) {
       onDocumentClick(doc);
@@ -61,6 +109,26 @@ const DocumentGrid = ({
 
   return (
     <div>
+      {/* Toast notification for successful deletion */}
+      <ToastContainer 
+        position="top-end" 
+        className="p-3" 
+        style={{ zIndex: 1100 }}
+      >
+        <Toast 
+          onClose={() => setShowToast(false)} 
+          show={showToast} 
+          delay={3000} 
+          autohide
+          bg="success"
+        >
+          <Toast.Header closeButton>
+            <strong className="me-auto">Success</strong>
+          </Toast.Header>
+          <Toast.Body className="text-white">{toastMessage}</Toast.Body>
+        </Toast>
+      </ToastContainer>
+
       {displayDocs.length === 0 ? (
         <div className="text-center py-5">
           <p className="text-muted">{emptyMessage}</p>
@@ -127,7 +195,7 @@ const DocumentGrid = ({
                   onClick={() => handleDocumentClick(doc)}
                   style={{ 
                     cursor: 'pointer',
-                    marginTop: '24px' // Reduce space above title
+                    marginTop: '24px' // Space above title
                   }}
                 >
                   <h5 className="mb-2 text" style={{ fontSize: '1.2rem' }}>

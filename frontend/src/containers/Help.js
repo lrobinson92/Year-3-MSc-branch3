@@ -5,22 +5,39 @@ import Sidebar from '../components/Sidebar';
 import GoogleDriveAuthCheck from '../components/GoogleDriveAuthCheck';
 import { FaFileAlt, FaUsers, FaCheckSquare, FaGoogle, FaEdit, FaLock } from 'react-icons/fa';
 
+/**
+ * Help Component
+ * 
+ * Comprehensive help and user guide section that provides information
+ * about all major features of the application. Includes sections on
+ * Google Drive integration, document management, team collaboration,
+ * task management, permissions, and advanced features.
+ * 
+ * The component is structured as a series of expandable sections with
+ * explanatory content, tables for permissions, and visual guides.
+ */
 const Help = ({ isAuthenticated }) => {
+  // Redirect to login if user is not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
   return (
     <div>
+      {/* Main layout with sidebar */}
       <div className="d-flex">
+        {/* Sidebar navigation component */}
         <Sidebar />
+        
+        {/* Main content area */}
         <div className="main-content">
           <div className="recent-items-card">
+            {/* Header */}
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h2>Help & User Guide</h2>
             </div>
             
-            {/* Google Drive Authentication Section */}
+            {/* Google Drive Authentication Section - Explains Google Drive integration */}
             <div className="mb-5">
               <h3 className="d-flex align-items-center mb-3">
                 <FaGoogle className="me-2" style={{ color: '#4285F4' }} /> 
@@ -43,6 +60,7 @@ const Help = ({ isAuthenticated }) => {
                   You'll see a prompt whenever you try to access document features without being connected.
                 </p>
                 
+                {/* Shows current Google Drive connection status */}
                 <div className="mt-3">
                   <GoogleDriveAuthCheck showPrompt={false}>
                     <div className="alert alert-success">
@@ -53,13 +71,14 @@ const Help = ({ isAuthenticated }) => {
               </div>
             </div>
             
-            {/* Documents Section */}
+            {/* Documents Section - Explains document creation and management */}
             <div className="mb-5">
               <h3 className="d-flex align-items-center mb-3">
                 <FaFileAlt className="me-2" style={{ color: '#0d6efd' }} /> 
                 Managing Documents
               </h3>
               <div className="card p-4 mb-4">
+                {/* Document creation methods subsection */}
                 <h5>Creating Documents</h5>
                 <p>
                   SOPify allows you to create Standard Operating Procedures (SOPs) in multiple ways:
@@ -72,6 +91,7 @@ const Help = ({ isAuthenticated }) => {
                   <li>Summarise a document using AI</li>
                 </ol>
                 
+                {/* Document viewing capabilities subsection */}
                 <h5 className="mt-3">Viewing Documents</h5>
                 <p>
                   From the Documents page, you can:
@@ -83,6 +103,7 @@ const Help = ({ isAuthenticated }) => {
                   <li>See when a document was last updated</li>
                 </ul>
                 
+                {/* Document editing workflow subsection */}
                 <h5 className="mt-3">Editing Documents</h5>
                 <p>
                   When viewing a document, click "Edit Document" to open it in Google Docs for editing.
@@ -91,13 +112,14 @@ const Help = ({ isAuthenticated }) => {
               </div>
             </div>
             
-            {/* Teams Section */}
+            {/* Teams Section - Explains team creation and management */}
             <div className="mb-5">
               <h3 className="d-flex align-items-center mb-3">
                 <FaUsers className="me-2" style={{ color: '#0d6efd' }} /> 
                 Working with Teams
               </h3>
               <div className="card p-4 mb-4">
+                {/* Team creation process */}
                 <h5>Creating Teams</h5>
                 <p>Teams allow you to collaborate with others on SOPs and tasks:</p>
                 <ol>
@@ -106,6 +128,7 @@ const Help = ({ isAuthenticated }) => {
                   <li>Enter a team name and description</li>
                 </ol>
                 
+                {/* Team member management capabilities */}
                 <h5 className="mt-3">Managing Team Members</h5>
                 <p>As a team owner, you can:</p>
                 <ul>
@@ -114,6 +137,7 @@ const Help = ({ isAuthenticated }) => {
                   <li>Remove members from the team</li>
                 </ul>
                 
+                {/* Team document sharing explanation */}
                 <h5 className="mt-3">Team Documents</h5>
                 <p>
                   When creating a document, you can assign it to a team, making it accessible to all team members.
@@ -122,13 +146,14 @@ const Help = ({ isAuthenticated }) => {
               </div>
             </div>
             
-            {/* Tasks Section */}
+            {/* Tasks Section - Explains task creation and management */}
             <div className="mb-5">
               <h3 className="d-flex align-items-center mb-3">
                 <FaCheckSquare className="me-2" style={{ color: '#0d6efd' }} /> 
                 Managing Tasks
               </h3>
               <div className="card p-4 mb-4">
+                {/* Task creation process */}
                 <h5>Creating Tasks</h5>
                 <p>Tasks help you track work related to SOPs:</p>
                 <ol>
@@ -137,12 +162,14 @@ const Help = ({ isAuthenticated }) => {
                   <li>Enter a description, assign a team member, set a due date, and choose a status</li>
                 </ol>
                 
+                {/* Task categorization explanation */}
                 <h5 className="mt-3">Types of Tasks</h5>
                 <ul>
                   <li><strong>My Tasks</strong> - Tasks assigned directly to you</li>
                   <li><strong>Team Tasks</strong> - Tasks for your teams assigned to other members</li>
                 </ul>
                 
+                {/* Task status types and their visual indicators */}
                 <h5 className="mt-3">Task Statuses</h5>
                 <ul>
                   <li>
@@ -156,6 +183,7 @@ const Help = ({ isAuthenticated }) => {
                   </li>
                 </ul>
                 
+                {/* Task reminder system explanation */}
                 <h5 className="mt-3">Task Reminders</h5>
                 <div className="alert alert-info">
                   <div className="d-flex align-items-center">
@@ -189,16 +217,18 @@ const Help = ({ isAuthenticated }) => {
               </div>
             </div>
             
-            {/* NEW SECTION: Permissions & Access Control */}
+            {/* Permissions & Access Control Section - Explains role-based security */}
             <div className="mb-5">
               <h3 className="d-flex align-items-center mb-3">
                 <FaLock className="me-2" style={{ color: '#dc3545' }} /> 
                 Permissions & Access Control
               </h3>
               <div className="card p-4 mb-4">
+                {/* Team role descriptions */}
                 <h5>Team Roles & Permissions</h5>
                 <p>SOPify uses role-based access control with three distinct roles for team collaboration:</p>
                 
+                {/* Role permissions table with detailed breakdown */}
                 <div className="table-responsive">
                   <table className="table table-bordered">
                     <thead className="table-light">
@@ -250,12 +280,14 @@ const Help = ({ isAuthenticated }) => {
                   </table>
                 </div>
                 
+                {/* Important notice about personal vs. team content */}
                 <div className="alert alert-warning mt-4">
                   <strong>Important:</strong> The permissions below apply only to team documents and tasks. 
                   Personal items (not assigned to any team) are fully controlled by their creator, 
                   regardless of role, and are not visible to other users.
                 </div>
                 
+                {/* Document permissions by role */}
                 <h5 className="mt-4">Team Document Permissions</h5>
                 <p>Access to team documents is controlled by your role in that team:</p>
                 
@@ -298,6 +330,7 @@ const Help = ({ isAuthenticated }) => {
                   </table>
                 </div>
                 
+                {/* Task permissions by role */}
                 <h5 className="mt-4">Team Task Permissions</h5>
                 <p>Team task management follows similar permission structure:</p>
                 
@@ -361,13 +394,14 @@ const Help = ({ isAuthenticated }) => {
               </div>
             </div>
             
-            {/* Advanced Features */}
+            {/* Advanced Features Section - Explains AI-powered features */}
             <div className="mb-5">
               <h3 className="d-flex align-items-center mb-3">
                 <FaEdit className="me-2" style={{ color: '#0d6efd' }} /> 
                 Advanced Features
               </h3>
               <div className="card p-4 mb-4">
+                {/* AI document generation workflow */}
                 <h5>AI-powered Document Generation</h5>
                 <p>
                   When creating a new document, you can use our AI-powered generator:
@@ -379,6 +413,7 @@ const Help = ({ isAuthenticated }) => {
                   <li>Edit as needed before saving</li>
                 </ol>
                 
+                {/* AI document improvement workflow */}
                 <h5 className="mt-3">Document Improvement</h5>
                 <p>
                   For existing documents, you can use AI to improve them:
@@ -397,8 +432,16 @@ const Help = ({ isAuthenticated }) => {
   );
 };
 
+/**
+ * Maps Redux state to component props
+ * Provides authentication status to protect this route
+ */
 const mapStateToProps = (state) => ({
   isAuthenticated: state.auth.isAuthenticated
 });
 
+/**
+ * Connect component to Redux store
+ * This enables access to the isAuthenticated state property
+ */
 export default connect(mapStateToProps)(Help);

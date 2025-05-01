@@ -3,44 +3,62 @@ import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { setDriveLoggedIn } from '../actions/googledrive';
 
+/**
+ * GoogleAuthCallback Component
+ * 
+ * Handles the callback from Google Drive OAuth authentication.
+ * This component acts as a middleware between the Google OAuth flow
+ * and the application by processing the authentication response
+ * and updating the application state.
+ */
 const GoogleAuthCallback = ({ setDriveLoggedIn }) => {
+  // State to track loading status while processing authentication
   const [loading, setLoading] = useState(true);
+  
+  // State to store potential error messages
   const [error, setError] = useState(null);
+  
+  // Hook for programmatically navigating to other routes
   const navigate = useNavigate();
 
+  /**
+   * Process Google Drive authentication callback when component mounts
+   * Parses URL parameters to determine auth success, updates Redux state,
+   * and redirects to the original destination
+   */
   useEffect(() => {
-    console.log('GoogleAuthCallback mounted - processing Google Drive authentication');
-    
-    // Check if we have drive_auth=success in the URL
+    // Extract the drive_auth parameter from the URL query string
     const urlParams = new URLSearchParams(window.location.search);
     const driveAuth = urlParams.get('drive_auth');
     
     if (driveAuth === 'success') {
-      console.log('Google Drive auth successful, updating Redux state');
+      // Authentication was successful
       
-      // Update Redux state
+      // Update Redux state to reflect that user is logged into Google Drive
       setDriveLoggedIn(true);
       
-      // Clear any remaining flags from sessionStorage
+      // Clean up session storage items used during the auth flow
       sessionStorage.removeItem('redirectingToGoogleDrive');
+      
+      // Get the original destination the user was trying to access
+      // Default to documents page if no specific destination was saved
+      const destination = sessionStorage.getItem('googleDriveRedirect') || '/view/documents';
       sessionStorage.removeItem('googleDriveRedirect');
       
-      // Get the original destination or default to documents page
-      const destination = sessionStorage.getItem('googleDriveRedirect') || '/view/documents';
-      
-      console.log(`Redirecting to original destination: ${destination}`);
-      
-      // Short delay to ensure state updates are processed
+      // Add a small delay before navigation to ensure Redux state updates are processed
       setTimeout(() => {
         navigate(destination);
       }, 100);
     } else {
-      console.error('No drive_auth=success parameter found in URL');
+      // Authentication failed or was cancelled by the user
       setError('Authentication failed or was cancelled');
       setLoading(false);
     }
   }, [navigate, setDriveLoggedIn]);
 
+  /**
+   * Loading screen while authentication is being processed
+   */
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center vh-100">
@@ -54,6 +72,9 @@ const GoogleAuthCallback = ({ setDriveLoggedIn }) => {
     );
   }
 
+  /**
+   * Error screen if authentication failed
+   */
   if (error) {
     return (
       <div className="d-flex justify-content-center align-items-center vh-100">
@@ -72,7 +93,13 @@ const GoogleAuthCallback = ({ setDriveLoggedIn }) => {
     );
   }
 
+  // This component shouldn't render anything if processing was successful
+  // since it will immediately redirect to another page
   return null;
 };
 
+/**
+ * Connect component to Redux store
+ * Provides access to the setDriveLoggedIn action
+ */
 export default connect(null, { setDriveLoggedIn })(GoogleAuthCallback);

@@ -6,18 +6,26 @@ import { FaFileAlt, FaUsers, FaCheckSquare, FaGoogle, FaRocket, FaLightbulb } fr
 import bannerImage from '../assests/images/night-sky.jpg';
 import cardPreview from '../assests/images/dashboard.png';
 
+/**
+ * Home Component
+ * 
+ * Landing page for unauthenticated users with marketing content and value proposition.
+ * Includes sections for hero banner, features, workflow steps, benefits, and call-to-action.
+ * Automatically redirects authenticated users to the dashboard.
+ */
 const Home = ({ isAuthenticated }) => {
-    // SOPify brand purple color
-    const brandPurple = '#111049'; // Your exact dark purple color
-    const brandLightPurple = '#615fd8'; // Your exact light purple color
+    // Brand color definitions for consistent styling
+    const brandPurple = '#111049'; 
+    const brandLightPurple = '#615fd8';
 
+    // Redirect authenticated users to dashboard
     if (isAuthenticated) {
         return <Navigate to="view/dashboard/" />;
     }
 
     return (
         <div className="home-page">
-            {/* Hero Section with Brand Purple Gradient Overlay */}
+            {/* Hero Section - Main banner with call-to-action buttons */}
             <div className="hero-section position-relative">
                 <img
                     src={bannerImage}
@@ -27,7 +35,6 @@ const Home = ({ isAuthenticated }) => {
                 />
                 <div className="position-absolute top-0 start-0 w-100 h-100" 
                     style={{ 
-                        
                         display: 'flex',
                         alignItems: 'center',
                         padding: '0 10%'
@@ -50,7 +57,7 @@ const Home = ({ isAuthenticated }) => {
             </div>
 
             <div className='container py-5'>
-                {/* Value Proposition */}
+                {/* Value Proposition - Core message about product benefits */}
                 <div className="text-center mb-5">
                     <h2 className="display-5 fw-bold mb-3">Streamline Your Business Procedures</h2>
                     <p className="lead fs-4 text-muted mx-auto" style={{ maxWidth: '800px' }}>
@@ -59,8 +66,9 @@ const Home = ({ isAuthenticated }) => {
                     </p>
                 </div>
 
-                {/* Feature Cards */}
+                {/* Feature Cards - Core product capabilities */}
                 <div className="row g-4 mb-5">
+                    {/* Document Management Feature */}
                     <div className="col-md-4">
                         <div className="card h-100 shadow-sm border-0">
                             <div className="card-body p-4">
@@ -74,6 +82,8 @@ const Home = ({ isAuthenticated }) => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Team Collaboration Feature */}
                     <div className="col-md-4">
                         <div className="card h-100 shadow-sm border-0">
                             <div className="card-body p-4">
@@ -87,6 +97,8 @@ const Home = ({ isAuthenticated }) => {
                             </div>
                         </div>
                     </div>
+
+                    {/* AI-Powered Generation Feature */}
                     <div className="col-md-4">
                         <div className="card h-100 shadow-sm border-0">
                             <div className="card-body p-4">
@@ -102,10 +114,11 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* How It Works Section */}
+                {/* How It Works - Step-by-step workflow explanation */}
                 <div className="py-5">
                     <h2 className="display-6 fw-bold text-center mb-5">How SOPify Works</h2>
                     <div className="row g-4">
+                        {/* Step 1: Create Team */}
                         <div className="col-md-3">
                             <div className="steps text-center">
                                 <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
@@ -121,6 +134,8 @@ const Home = ({ isAuthenticated }) => {
                                 <p className="text-muted">Invite members and organize your departments</p>
                             </div>
                         </div>
+
+                        {/* Step 2: Connect Drive */}
                         <div className="col-md-3">
                             <div className="steps text-center">
                                 <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
@@ -136,6 +151,8 @@ const Home = ({ isAuthenticated }) => {
                                 <p className="text-muted">Link your Google Drive for secure document storage</p>
                             </div>
                         </div>
+
+                        {/* Step 3: Create SOPs */}
                         <div className="col-md-3">
                             <div className="steps text-center">
                                 <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
@@ -151,6 +168,8 @@ const Home = ({ isAuthenticated }) => {
                                 <p className="text-muted">Write or generate professional SOPs</p>
                             </div>
                         </div>
+
+                        {/* Step 4: Track Tasks */}
                         <div className="col-md-3">
                             <div className="steps text-center">
                                 <div className="step-number text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
@@ -169,7 +188,7 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* Application Preview */}
+                {/* Application Preview - Dashboard showcase with feature list */}
                 <div className="row align-items-center py-5">
                     <div className="col-lg-5 mb-4 mb-lg-0">
                         <h2 className="display-6 fw-bold mb-3">Powerful, Yet Simple To Use</h2>
@@ -209,10 +228,11 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* Benefits */}
+                {/* Benefits Section - Key value propositions */}
                 <div className="py-5">
                     <h2 className="display-6 fw-bold text-center mb-5">Why Teams Love SOPify</h2>
                     <div className="row g-4">
+                        {/* Consistency Benefit */}
                         <div className="col-md-4">
                             <div className="card h-100 shadow-sm border-0">
                                 <div className="card-body p-4">
@@ -226,6 +246,8 @@ const Home = ({ isAuthenticated }) => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Time-saving Benefit */}
                         <div className="col-md-4">
                             <div className="card h-100 shadow-sm border-0">
                                 <div className="card-body p-4">
@@ -239,6 +261,8 @@ const Home = ({ isAuthenticated }) => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Integration Benefit */}
                         <div className="col-md-4">
                             <div className="card h-100 shadow-sm border-0">
                                 <div className="card-body p-4">
@@ -255,7 +279,7 @@ const Home = ({ isAuthenticated }) => {
                     </div>
                 </div>
 
-                {/* Call to Action */}
+                {/* Call to Action - Final conversion section */}
                 <div className="p-5 text-center rounded-3 mt-5"
                     style={{
                         background: `linear-gradient(175deg, ${brandPurple} 0%, ${brandLightPurple} 100%)`,
@@ -274,8 +298,15 @@ const Home = ({ isAuthenticated }) => {
     );
 };
 
+/**
+ * Maps Redux state to component props
+ * Used to determine if user is already authenticated
+ */
 const mapStateToProps = state => ({
     isAuthenticated: state.auth.isAuthenticated
 });
 
+/**
+ * Connect component to Redux store
+ */
 export default connect(mapStateToProps)(Home);

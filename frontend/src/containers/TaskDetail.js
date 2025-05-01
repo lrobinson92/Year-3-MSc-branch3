@@ -9,6 +9,15 @@ import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 import { FaArrowLeft, FaTrash, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
 
+/**
+ * TaskDetail Component
+ * 
+ * Displays detailed information for a single task and provides functionality
+ * for editing, completing, or deleting the task. Only users with appropriate
+ * permissions can modify tasks (the task creator, team owners, or admins).
+ * 
+ * The component handles loading states, permission checks, and API interactions.
+ */
 const TaskDetail = ({ 
     getTaskDetails, 
     updateTask, 
@@ -17,9 +26,11 @@ const TaskDetail = ({
     isAuthenticated, 
     user 
 }) => {
+    // Extract task ID from URL parameters
     const { taskId } = useParams();
     const navigate = useNavigate();
     
+    // Task data state with default empty values
     const [taskData, setTaskData] = useState({
         description: '',
         assigned_to: '',
@@ -28,15 +39,20 @@ const TaskDetail = ({
         status: 'not_started',
     });
     
-    const [teams, setTeams] = useState([]);
-    const [teamMembers, setTeamMembers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [isEditing, setIsEditing] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [originalTask, setOriginalTask] = useState(null);
+    // UI state management
+    const [teams, setTeams] = useState([]);                // List of teams user belongs to
+    const [teamMembers, setTeamMembers] = useState([]);    // List of team members for selected team
+    const [loading, setLoading] = useState(true);          // Loading state for initial data fetch
+    const [error, setError] = useState(null);              // Error state for API failures
+    const [isEditing, setIsEditing] = useState(false);     // Whether edit mode is active
+    const [showDeleteModal, setShowDeleteModal] = useState(false); // Delete confirmation modal visibility
+    const [isDeleting, setIsDeleting] = useState(false);   // Loading state for delete operation
+    const [originalTask, setOriginalTask] = useState(null); // Original task data for permission checks
     
+    /**
+     * Fetch task details and related data on component mount
+     * Includes task details, teams list, and team members if applicable
+     */
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -72,6 +88,10 @@ const TaskDetail = ({
         fetchData();
     }, [taskId, getTaskDetails, fetchTeams]);
     
+    /**
+     * Update team members when team selection changes during editing
+     * This ensures the assigned_to dropdown shows the correct members
+     */
     useEffect(() => {
         // Update team members when team selection changes
         const fetchTeamMembers = async () => {
@@ -86,6 +106,7 @@ const TaskDetail = ({
                     console.error('Error fetching team members:', err);
                 }
             } else {
+                // Reset team members when no team is selected
                 setTeamMembers([]);
             }
         };
@@ -95,6 +116,10 @@ const TaskDetail = ({
         }
     }, [taskData.team, isEditing]);
     
+    /**
+     * Handle form field changes
+     * Special handling for team selection to reset assigned_to
+     */
     const handleChange = (e) => {
         const { name, value } = e.target;
         
@@ -103,7 +128,7 @@ const TaskDetail = ({
             setTaskData(prev => ({
                 ...prev,
                 [name]: value,
-                // Reset assigned_to when team changes
+                // Reset assigned_to when team changes to prevent invalid assignments
                 assigned_to: value ? '' : (user ? user.id : '')
             }));
         } else {
@@ -114,6 +139,9 @@ const TaskDetail = ({
         }
     };
     
+    /**
+     * Submit edited task data to the API
+     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -127,6 +155,9 @@ const TaskDetail = ({
         }
     };
     
+    /**
+     * Handle task deletion after confirmation
+     */
     const handleDelete = async () => {
         setIsDeleting(true);
         
@@ -142,6 +173,10 @@ const TaskDetail = ({
         }
     };
     
+    /**
+     * Update only the task status
+     * Used for quick status changes like marking complete
+     */
     const handleStatusUpdate = async (newStatus) => {
         try {
             const updatedTask = { ...taskData, status: newStatus };
@@ -153,16 +188,19 @@ const TaskDetail = ({
         }
     };
     
-    // Check if user can edit this task
+    /**
+     * Check if current user has permission to edit this task
+     * Returns true if user is the task creator, a team owner, or admin
+     */
     const canEditTask = () => {
         if (!user || !originalTask) return false;
         
-        // If it's a personal task assigned to the user
+        // Personal task: user must be assigned to the task
         if (originalTask.assigned_to === user.id && !originalTask.team) {
             return true;
         }
         
-        // If it's a team task and user is a team member
+        // Team task: check user's role in the team
         if (originalTask.team) {
             const userTeamMembership = teamMembers.find(member => member.user === user.id);
             // Team owners and admins can edit any team task
@@ -172,7 +210,10 @@ const TaskDetail = ({
         return false;
     };
     
-    // Helper to format status text
+    /**
+     * Format status text for display
+     * Converts snake_case to Title Case
+     */
     const formatStatus = (status) => {
         const statusMap = {
             'not_started': 'Not Started',
@@ -182,7 +223,10 @@ const TaskDetail = ({
         return statusMap[status] || status;
     };
     
-    // Helper to check if task is past due
+    /**
+     * Check if task is past due date
+     * Returns true if due date is in the past and task is not complete
+     */
     const isPastDue = () => {
         if (!taskData.due_date || taskData.status === 'complete') return false;
         const now = new Date();
@@ -190,6 +234,7 @@ const TaskDetail = ({
         return due < now;
     };
     
+    // Show loading spinner while data is being fetched
     if (loading) {
         return (
             <div className="d-flex">
@@ -203,6 +248,7 @@ const TaskDetail = ({
         );
     }
     
+    // Show error message if data fetch failed
     if (error) {
         return (
             <div className="d-flex">
@@ -219,9 +265,13 @@ const TaskDetail = ({
     
     return (
         <div className="d-flex">
+            {/* Sidebar navigation */}
             <Sidebar />
+            
+            {/* Main content area */}
             <div className="main-content">
                 <div className="container py-4">
+                    {/* Header with navigation and action buttons */}
                     <div className="mb-4 d-flex justify-content-between align-items-center">
                         <div className="d-flex align-items-center">
                             <Link to="/view/tasks" className="btn btn-outline-secondary me-3">
@@ -232,6 +282,7 @@ const TaskDetail = ({
                             </h1>
                         </div>
                         
+                        {/* Task action buttons - only shown when not editing and user has permissions */}
                         {!isEditing && canEditTask() && (
                             <div className="btn-group">
                                 <button 
@@ -258,6 +309,7 @@ const TaskDetail = ({
                         )}
                     </div>
                     
+                    {/* Warning banner for overdue tasks */}
                     {isPastDue() && (
                         <div className="alert alert-danger d-flex align-items-center">
                             <FaExclamationTriangle className="me-2" />
@@ -265,10 +317,12 @@ const TaskDetail = ({
                         </div>
                     )}
                     
+                    {/* Task edit form - displayed when isEditing is true */}
                     {isEditing ? (
                         <div className="card shadow-sm">
                             <div className="card-body">
                                 <form onSubmit={handleSubmit}>
+                                    {/* Task description field */}
                                     <div className="mb-3">
                                         <label htmlFor="description" className="form-label">Description</label>
                                         <textarea
@@ -281,6 +335,7 @@ const TaskDetail = ({
                                         />
                                     </div>
                                     
+                                    {/* Team selection dropdown */}
                                     <div className="mb-3">
                                         <label htmlFor="team" className="form-label">Team (Optional)</label>
                                         <select
@@ -297,6 +352,7 @@ const TaskDetail = ({
                                         </select>
                                     </div>
                                     
+                                    {/* Assigned user selection dropdown */}
                                     <div className="mb-3">
                                         <label htmlFor="assigned_to" className="form-label">Assigned To</label>
                                         <select
@@ -318,6 +374,7 @@ const TaskDetail = ({
                                         </select>
                                     </div>
                                     
+                                    {/* Due date selection */}
                                     <div className="mb-3">
                                         <label htmlFor="due_date" className="form-label">Due Date</label>
                                         <input
@@ -331,6 +388,7 @@ const TaskDetail = ({
                                         />
                                     </div>
                                     
+                                    {/* Status selection dropdown */}
                                     <div className="mb-3">
                                         <label htmlFor="status" className="form-label">Status</label>
                                         <select
@@ -346,6 +404,7 @@ const TaskDetail = ({
                                         </select>
                                     </div>
                                     
+                                    {/* Form action buttons */}
                                     <div className="d-flex justify-content-end mt-4">
                                         <button
                                             type="button"
@@ -365,27 +424,33 @@ const TaskDetail = ({
                             </div>
                         </div>
                     ) : (
+                        /* Task details view - displayed when not editing */
                         <div className="card shadow-sm">
                             <div className="card-body">
                                 <dl className="row">
+                                    {/* Task description */}
                                     <dt className="col-sm-3">Description</dt>
                                     <dd className="col-sm-9">{taskData.description}</dd>
                                     
+                                    {/* Team name */}
                                     <dt className="col-sm-3">Team</dt>
                                     <dd className="col-sm-9">
                                         {taskData.team_name || 'Personal Task'}
                                     </dd>
                                     
+                                    {/* Assigned user */}
                                     <dt className="col-sm-3">Assigned To</dt>
                                     <dd className="col-sm-9">
                                         {taskData.assigned_to_name || 'Unassigned'}
                                     </dd>
                                     
+                                    {/* Due date */}
                                     <dt className="col-sm-3">Due Date</dt>
                                     <dd className="col-sm-9">
                                         {new Date(taskData.due_date).toLocaleDateString()}
                                     </dd>
                                     
+                                    {/* Status with colored badge */}
                                     <dt className="col-sm-3">Status</dt>
                                     <dd className="col-sm-9">
                                         <span className={`badge ${
@@ -397,11 +462,13 @@ const TaskDetail = ({
                                         </span>
                                     </dd>
                                     
+                                    {/* Creation timestamp */}
                                     <dt className="col-sm-3">Created</dt>
                                     <dd className="col-sm-9">
                                         {new Date(taskData.created_at).toLocaleString()}
                                     </dd>
                                     
+                                    {/* Last update timestamp */}
                                     <dt className="col-sm-3">Last Updated</dt>
                                     <dd className="col-sm-9">
                                         {new Date(taskData.updated_at).toLocaleString()}
@@ -442,11 +509,19 @@ const TaskDetail = ({
     );
 };
 
+/**
+ * Maps Redux state to component props
+ * Provides authentication status and user details
+ */
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
     user: state.auth.user
 });
 
+/**
+ * Connect component to Redux store
+ * Provides access to actions and state
+ */
 export default connect(
     mapStateToProps, 
     { getTaskDetails, updateTask, deleteTask, fetchTeams }

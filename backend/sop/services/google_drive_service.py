@@ -12,6 +12,7 @@ from oauth2client.client import OAuth2Credentials
 
 logger = logging.getLogger(__name__)
 
+# the following was modified from Google Drive documentation:
 class GoogleDriveService:
     def __init__(self, credentials_json):
         self.gauth = GoogleAuth()

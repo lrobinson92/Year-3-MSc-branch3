@@ -13,24 +13,44 @@ import { redirectToGoogleDriveLogin } from '../utils/driveAuthUtils';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 
+/**
+ * TeamDetail Component
+ * 
+ * Displays comprehensive information about a team including:
+ * - Team details (name, description)
+ * - Team members list
+ * - Team tasks
+ * - Team documents
+ * 
+ * Provides functionality for team management including inviting members,
+ * creating tasks, adding documents, and document deletion.
+ */
 const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
+    // Get team ID from URL parameters
     const { teamId } = useParams();
-    const [team, setTeam] = useState(null);
-    const [members, setMembers] = useState([]);
-    const [tasks, setTasks] = useState([]);
-    const [filteredTasks, setFilteredTasks] = useState([]);
-    const [documents, setDocuments] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const navigate = useNavigate();
     
-    // Add document deletion state
+    // State for team data
+    const [team, setTeam] = useState(null);           // Team details
+    const [members, setMembers] = useState([]);       // Team members list
+    const [tasks, setTasks] = useState([]);           // All team tasks
+    const [filteredTasks, setFilteredTasks] = useState([]); // Active/upcoming tasks
+    const [documents, setDocuments] = useState([]);   // Team documents
+    
+    // UI state
+    const [loading, setLoading] = useState(true);     // Loading indicator
+    const [error, setError] = useState(null);         // Error message
+    
+    // Document deletion state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [documentToDelete, setDocumentToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState(null);
 
-    // Handle document click with Google Drive auth logic
+    /**
+     * Handle document click with Google Drive authentication check
+     * Redirects to Google auth if not logged in, or to document viewer if logged in
+     */
     const handleDocumentClick = (doc) => {
         if (!driveLoggedIn) {
             // Save the current URL for returning after login
@@ -41,7 +61,10 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
         }
     };
     
-    // Check if user can delete document
+    /**
+     * Check if current user has permission to delete a document
+     * Returns true if user is document owner or team owner
+     */
     const canDeleteDocument = (document) => {
         if (!user) return false;
         
@@ -57,14 +80,20 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
         return false;
     };
 
-    // Handle delete button click
+    /**
+     * Handle delete button click
+     * Sets up the document deletion modal
+     */
     const handleDeleteClick = (document) => {
         setDocumentToDelete(document);
         setShowDeleteModal(true);
         setDeleteError(null);
     };
 
-    // Handle confirming document deletion
+    /**
+     * Handle document deletion confirmation
+     * Sends delete request to API and updates UI on success
+     */
     const handleConfirmDelete = async () => {
         if (!documentToDelete) return;
         
@@ -88,29 +117,47 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
         }
     };
 
-    // Document action handlers for DocumentGrid
+    // Document action handlers passed to DocumentGrid component
     const documentActions = {
         onDelete: handleDeleteClick,
         canDelete: canDeleteDocument
     };
 
+    /**
+     * Fetch team data on component mount
+     * Includes team details, members, tasks, and documents
+     */
     useEffect(() => {
         const fetchTeamData = async () => {
             try {
+                // Fetch updated teams list first
                 await fetchTeams();
 
-                const teamRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/${teamId}/`, { withCredentials: true });
+                // Fetch team details including members
+                const teamRes = await axiosInstance.get(
+                    `${process.env.REACT_APP_API_URL}/api/teams/${teamId}/`, 
+                    { withCredentials: true }
+                );
                 setTeam(teamRes.data);
                 setMembers(teamRes.data.members);
 
-                const tasksRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/tasks/`, { withCredentials: true });
+                // Fetch all tasks and filter for current team
+                const tasksRes = await axiosInstance.get(
+                    `${process.env.REACT_APP_API_URL}/api/tasks/`, 
+                    { withCredentials: true }
+                );
                 const teamTasks = tasksRes.data.filter(task => task.team === parseInt(teamId));
                 setTasks(teamTasks);
 
+                // Fetch team documents
                 try {
-                    const docsRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/documents/team/${teamId}/`, { withCredentials: true });
+                    const docsRes = await axiosInstance.get(
+                        `${process.env.REACT_APP_API_URL}/api/documents/team/${teamId}/`, 
+                        { withCredentials: true }
+                    );
                     setDocuments(docsRes.data);
-                } catch {
+                } catch (docError) {
+                    // Set documents to empty array if there's an error
                     setDocuments([]);
                 }
             } catch (err) {
@@ -124,6 +171,10 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
         fetchTeamData();
     }, [teamId, fetchTeams]);
 
+    /**
+     * Filter tasks to show only active and upcoming tasks
+     * Removes completed tasks that are in the past
+     */
     useEffect(() => {
         const today = new Date();
 
@@ -131,8 +182,10 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
             if (!tasks) return [];
 
             return tasks.filter(task => {
+                // Keep all non-completed tasks
                 if (task.status !== 'complete') return true;
 
+                // Keep completed tasks only if they're recent
                 const dueDate = new Date(task.due_date);
                 return dueDate > today;
             });
@@ -141,29 +194,61 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
         setFilteredTasks(filterTasks());
     }, [tasks]);
 
+    /**
+     * Check if current user is a team owner
+     * Used for permission checks on UI elements
+     */
     const isTeamOwner = () => {
         if (!team || !user) return false;
         const userMembership = team.members?.find(member => member.user === user.id);
         return userMembership?.role === 'owner';
     };
 
+    // Redirect to login if not authenticated
     if (!isAuthenticated) return <Navigate to="/login" />;
-    if (loading) return <div>Loading...</div>;
-    if (error) return <div>{error}</div>;
+    
+    // Show loading state
+    if (loading) return (
+        <div className="d-flex">
+            <Sidebar />
+            <div className="main-content d-flex justify-content-center align-items-center">
+                <div className="spinner-border" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    );
+    
+    // Show error state
+    if (error) return (
+        <div className="d-flex">
+            <Sidebar />
+            <div className="main-content p-4">
+                <div className="alert alert-danger">{error}</div>
+                <Link to="/view/teams" className="btn btn-primary">Return to Teams</Link>
+            </div>
+        </div>
+    );
 
     return (
         <div className="d-flex">
+            {/* Sidebar navigation */}
             <Sidebar />
+            
+            {/* Main content area */}
             <div className="main-content">
                 <div className="recent-items-card">
+                    {/* Team header section */}
                     <div className="d-flex justify-content-between align-items-center mb-1">
                         <h1>{team.name}</h1>
                     </div>
                     <p className="team-description mb-4">Description: {team.description}</p>
 
+                    {/* Team members section */}
                     <div className="mb-4">
                         <div className="d-flex justify-content-between align-items-center mb-1">
                             <h3>Team Members</h3>
+                            {/* Only show invite button for team owners */}
                             {isTeamOwner() && (
                                 <Link 
                                     to={`/invite-member/${teamId}`} 
@@ -174,6 +259,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
                                 </Link>
                             )}
                         </div>
+                        {/* Member avatars list */}
                         <ul className="member-list">
                             {members && members.map((member) => (
                                 <li key={member.id}>
@@ -188,6 +274,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
                         </ul>
                     </div>
 
+                    {/* Team tasks section */}
                     <div className="my-5">
                         <div className="d-flex justify-content-between align-items-center mb-3">
                             <h2>Team Tasks</h2>
@@ -198,6 +285,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
                                 <FaPlus className="me-1" /> Create Task
                             </Link>
                         </div>
+                        {/* Task table component */}
                         <TaskTable 
                             tasks={filteredTasks} 
                             emptyMessage="No active tasks for this team" 
@@ -210,6 +298,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
                         />
                     </div>
 
+                    {/* Team documents section */}
                     <div className="mb-4">
                         <div className="d-flex justify-content-between align-items-center mb-1">
                             <h3>Documents</h3>
@@ -223,6 +312,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
                                         <FcGoogle className="me-1" /> Connect Google Drive
                                     </button>
                                 )}
+                                {/* Create document button */}
                                 <Link 
                                     to={`/create-document?teamId=${teamId}`} 
                                     className="btn btn-sm btn-outline-primary d-flex align-items-center"
@@ -232,6 +322,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
                                 </Link>
                             </div>
                         </div>
+                        {/* Document grid component */}
                         <DocumentGrid 
                             documents={documents}
                             emptyMessage="No documents found for this team"
@@ -240,7 +331,7 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
                             showTeamName={false}
                             onDocumentClick={handleDocumentClick}
                             driveLoggedIn={driveLoggedIn}
-                            actions={documentActions} // Pass document actions
+                            actions={documentActions}
                         />
                     </div>
                 </div>
@@ -276,10 +367,17 @@ const TeamDetail = ({ isAuthenticated, user, fetchTeams, driveLoggedIn }) => {
     );
 };
 
+/**
+ * Maps Redux state to component props
+ * Provides authentication status, user details, and Google Drive connection status
+ */
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
     user: state.auth.user,
     driveLoggedIn: state.googledrive.driveLoggedIn
 });
 
+/**
+ * Connect component to Redux store
+ */
 export default connect(mapStateToProps, { fetchTeams })(TeamDetail);

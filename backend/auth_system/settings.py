@@ -148,10 +148,15 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": (
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-        "rest_framework_simplejwt.authentication.JWTAuthentication",        
+        'rest_framework_simplejwt.authentication.JWTAuthentication',        
     ),
+    # Override permissions for Djoser registration views
+    'DEFAULT_PERMISSION_CLASSES_BY_URL_PATH': {
+        r'^/auth/users/?$': ['rest_framework.permissions.AllowAny'],
+        r'^/auth/users/activation/?$': ['rest_framework.permissions.AllowAny'],
+        r'^/auth/jwt/create/?$': ['rest_framework.permissions.AllowAny'],
+        r'^/auth/users/reset_password/?$': ['rest_framework.permissions.AllowAny'],
+    }
 }
 
 SIMPLE_JWT = {
