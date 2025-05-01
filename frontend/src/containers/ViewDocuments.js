@@ -8,14 +8,14 @@ import axiosInstance from '../utils/axiosConfig';
 const ViewDocuments = ({ isAuthenticated, onedriveLogin, uploadDocument }) => {
     
     const [documents, setDocuments] = useState([]);
-    const [loading, setLoading] = useState(true);
+   // const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     
-    useEffect(() => {
+    /*useEffect(() => {
         const fetchDocuments = async () => {
             try {
-                const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/documents/`, {
+                const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/sop/documents/`, {
                     withCredentials: true,  // Include credentials in the request
                     headers: {
                         "Accept": "application/json",
@@ -35,15 +35,12 @@ const ViewDocuments = ({ isAuthenticated, onedriveLogin, uploadDocument }) => {
         };
 
         fetchDocuments();
-    }, []);
+    }, []); */
 
-    if (!isAuthenticated) {
-        return <Navigate to="/login" />;
-    }
 
-    if (loading) {
+    /*if (loading) {
         return <div>Loading...</div>;
-    }
+    }*/
 
     if (error) {
         return <div>{error}</div>;
@@ -53,10 +50,10 @@ const ViewDocuments = ({ isAuthenticated, onedriveLogin, uploadDocument }) => {
         onedriveLogin();
     };
 
-    const handleFileUpload = async (event) => {
+    /*const handleFileUpload = async (event) => {
         const file = event.target.files[0];
         await uploadDocument(file);
-    };
+    };*/
 
     return (
         <div>
@@ -72,7 +69,7 @@ const ViewDocuments = ({ isAuthenticated, onedriveLogin, uploadDocument }) => {
                             </Link>
                         </div>
                         <button onClick={handleLogin} className="btn btn-primary">Login to OneDrive</button>
-                        <input type="file" onChange={handleFileUpload} />
+                        {/*<input type="file" onChange={handleFileUpload} />
                         <div className="row">
                             {Array.isArray(documents) && documents.length > 0 ? (
                                 documents.map((document) => (
@@ -88,7 +85,7 @@ const ViewDocuments = ({ isAuthenticated, onedriveLogin, uploadDocument }) => {
                             ) : (
                                 <p>No documents available</p>
                             )}
-                        </div>
+                        </div>*/}
                     </div>
                 </div>
             </div>
