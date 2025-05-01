@@ -17,25 +17,33 @@ import {
     PASSWORD_RESET_CONFIRM_FAIL
 } from './types';
 
+/**
+ * Check if the user is authenticated with valid credentials
+ * Verifies authentication status with the backend
+ */
 export const checkAuthenticated = () => async dispatch => {
-    
-        try {
-            const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/auth/users/me/`, {
-                withCredentials: true, // This ensures cookies are sent along with the request
-            });
+    try {
+        // Attempt to get user data to verify authentication
+        const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/auth/users/me/`, {
+            withCredentials: true, // Include cookies for JWT authentication
+        });
 
-            dispatch({
-                type: AUTHENTICATED_SUCCESS,
-                payload: res.data
-            });
-        } catch (err) {
-            dispatch({
-                type: AUTHENTICATED_FAIL
-            });
-        }
+        dispatch({
+            type: AUTHENTICATED_SUCCESS,
+            payload: res.data
+        });
+    } catch (err) {
+        // If request fails, user is not authenticated
+        dispatch({
+            type: AUTHENTICATED_FAIL
+        });
+    }
 };
 
-
+/**
+ * Load user data from the backend
+ * Requires an access token in localStorage
+ */
 export const load_user = () => async dispatch => {
     if (localStorage.getItem('access')) {
         const config = {
@@ -46,6 +54,7 @@ export const load_user = () => async dispatch => {
         };
 
         try {
+            // Fetch current user details
             const res = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/auth/users/me/`, config);
 
             dispatch({
@@ -58,12 +67,22 @@ export const load_user = () => async dispatch => {
             });
         }
     } else {
+        // No access token available
         dispatch({
             type: USER_LOADED_FAIL
         });
     }
 };
 
+/**
+ * Register a new user account
+ * 
+ * @param {string} name - User's full name
+ * @param {string} email - User's email address
+ * @param {string} password - User's password
+ * @param {string} re_password - Password confirmation
+ * @returns {string} Success message or throws error
+ */
 export const signup = (name, email, password, re_password) => async dispatch => {
     const config = {
         headers: {
@@ -82,19 +101,24 @@ export const signup = (name, email, password, re_password) => async dispatch => 
             payload: res.data,
         });
 
-        return "success"; // Indicate success
+        return "success"; // Indicate successful registration
     } catch (err) {
         dispatch({
             type: SIGNUP_FAIL,
         });
 
-        // Pass the error response to the caller
+        // Extract error message or provide a default
         throw err.response?.data?.email || "Signup failed. Please try again.";
     }
 };
 
+/**
+ * Activate a user account with verification token
+ * 
+ * @param {string} uid - User ID from activation email
+ * @param {string} token - Verification token from activation email
+ */
 export const verify = (uid, token) => async dispatch => {
-
     const config = {
         headers: {
             'Content-Type': 'application/json'
@@ -118,14 +142,17 @@ export const verify = (uid, token) => async dispatch => {
     }
 };
 
-
+/**
+ * Authenticate user with email and password
+ * 
+ * @param {string} email - User's email address
+ * @param {string} password - User's password
+ */
 export const login = (email, password) => async dispatch => {
-    
     const body = JSON.stringify({ email, password });
 
-    console.log("Sending login request:", body);  // Debugging line
-
     try {
+        // Exchange credentials for JWT tokens
         const res = await axiosInstance.post(`${process.env.REACT_APP_API_URL}/auth/jwt/create/`, body);
 
         dispatch({
@@ -137,6 +164,7 @@ export const login = (email, password) => async dispatch => {
             }
         });
 
+        // Fetch additional user data after login
         dispatch(load_user());
     } catch (err) {
         dispatch({
@@ -146,13 +174,22 @@ export const login = (email, password) => async dispatch => {
     }
 };
 
+/**
+ * Reset the firstLogin flag in state
+ * Called after user completes onboarding flow
+ */
 export const resetFirstLogin = () => (dispatch) => {
     dispatch({
         type: 'RESET_FIRST_LOGIN'
     });
 };
 
-
+/**
+ * Initiate password reset process
+ * Sends a password reset email to the user
+ * 
+ * @param {string} email - User's email address
+ */
 export const reset_password = (email) => async dispatch => {
     const config = {
         headers: {
@@ -161,21 +198,29 @@ export const reset_password = (email) => async dispatch => {
         withCredentials: true,
     };
 
-     const body = JSON.stringify({ email });
+    const body = JSON.stringify({ email });
 
-     try {
+    try {
         await axiosInstance.post(`${process.env.REACT_APP_API_URL}/auth/users/reset_password/`, body, config);
 
         dispatch({
             type: PASSWORD_RESET_SUCCESS            
         });
-     } catch (err) {
+    } catch (err) {
         dispatch({
             type: PASSWORD_RESET_FAIL            
         });
-     }
+    }
 };
 
+/**
+ * Complete password reset with confirmation token
+ * 
+ * @param {string} uid - User ID from reset email
+ * @param {string} token - Reset token from email
+ * @param {string} new_password - New password
+ * @param {string} re_new_password - New password confirmation
+ */
 export const reset_password_confirm = (uid, token, new_password, re_new_password) => async dispatch => {
     const config = {
         headers: {
@@ -192,29 +237,47 @@ export const reset_password_confirm = (uid, token, new_password, re_new_password
         dispatch({
             type: PASSWORD_RESET_CONFIRM_SUCCESS,           
         });
-     } catch (err) {
+    } catch (err) {
         dispatch({
             type: PASSWORD_RESET_CONFIRM_FAIL,            
         });
-     }
+    }
 };
 
+/**
+ * Log out the current user
+ * Clears tokens from localStorage and notifies the backend
+ */
 export const logout = () => async dispatch => {
-    
-    const config = {
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        withCredentials: true,
-    };
-    
     try {
+        // Tell the backend to invalidate the session
+        const config = {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            withCredentials: true,
+        };
+        
         await axiosInstance.post(`${process.env.REACT_APP_API_URL}/auth/logout/`, {}, config);
-
+        
+        // Clear authentication tokens
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        
+        // Update Redux state
         dispatch({
             type: LOGOUT
         });
     } catch (err) {
         console.error("Logout failed", err);
+        
+        // Even if API call fails, still clear local storage and update state
+        // This ensures the user is logged out locally even if server request fails
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        
+        dispatch({
+            type: LOGOUT
+        });
     }
 };

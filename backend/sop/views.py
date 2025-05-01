@@ -1,87 +1,127 @@
-import requests
-from rest_framework import status, generics, viewsets
-from rest_framework.response import Response
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.sites.shortcuts import get_current_site
+from django.core.mail import send_mail
+from django.db.models import Q 
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import  redirect, get_object_or_404
+from django.utils.dateparse import parse_datetime
+from django.utils.decorators import method_decorator
+from django.views import View
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
+from oauth2client.client import OAuth2Credentials
+from openai import OpenAI
+from rest_framework import status, generics, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.core.mail import send_mail
-from django.contrib.auth import get_user_model
-from django.db.models import Q  # Import Q
-from django.http import JsonResponse
-from django.http import JsonResponse, HttpResponse
-from django.utils.decorators import method_decorator
-from .models import UserAccount, Team, TeamMembership, Task, Document
-from .serializers import TeamSerializer, TaskSerializer
-from django.contrib.sites.shortcuts import get_current_site
 from sop.serializers import UserCreateSerializer, DocumentSerializer
-from .permissions import IsOwnerOrAssignedUser
-from django.shortcuts import HttpResponseRedirect, redirect, get_object_or_404
-import urllib.parse
-from django.conf import settings
+from .models import UserAccount, Team, TeamMembership, Task, Document
+from .permissions import IsTeamMemberOrTaskOwner
+from .serializers import TeamSerializer, TaskSerializer
+from .services.google_drive_service import GoogleDriveService
+from .helpers.permission_helpers import validate_team_membership
+
 import logging
+import requests
 
-logger = logging.getLogger(__name__)  # Use Django's logging system
+# Initialize Django's logging system
+logger = logging.getLogger(__name__)
 
-def refresh_onedrive_token(user):
-    """Refresh OneDrive access token using the refresh token."""
-    refresh_token = user.profile.onedrive_refresh_token
-    if not refresh_token:
-        return None  # No refresh token available, user needs to re-authenticate
-
-    token_data = {
-        "client_id": settings.ONEDRIVE_CLIENT_ID,
-        "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-    }
-
-    response = requests.post(settings.ONEDRIVE_TOKEN_URL, data=token_data)
-    token_json = response.json()
-
-    logger.info("OneDrive Refresh Token Response: %s", token_json)  # Log the response
-
-    if "access_token" in token_json:
-        # Save new tokens in the user's profile
-        user.profile.onedrive_access_token = token_json["access_token"]
-        user.profile.onedrive_refresh_token = token_json.get("refresh_token", refresh_token)  # Keep old refresh token if not provided
-        user.profile.save()
-        return token_json["access_token"]
-    else:
-        return None  # Refresh failed, user may need to log in again
-    
-
+# Get the user model specified in settings
 User = get_user_model()
 
+# Prompt template for OpenAI API to generate SOPs with the correct format
+GENERATION_PROMPT = """You are creating a professional Standard Operating Procedure.
+
+FORMAT:
+TITLE: {title}
+PURPOSE: A clear statement of the SOP's objective
+SCOPE: Define what activities and personnel this covers
+PROCEDURE: Numbered steps in chronological order
+REFERENCES: Related documents or regulations
+
+Use concise, direct language with active voice. Include all necessary details without explanations outside this format."""
+
 class TeamViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Team model operations.
+    Provides CRUD operations with permission checks.
+    """
     queryset = Team.objects.all()
     serializer_class = TeamSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        """
+        Only return teams the current user belongs to.
+        """
         user = self.request.user
         return Team.objects.filter(team_memberships__user=user)
 
     def perform_create(self, serializer):
+        """
+        When creating a team:
+        1. Save the team with the current user as creator
+        2. Add the creator as an owner in team memberships
+        """
         team = serializer.save(created_by=self.request.user)
-        # Create a TeamMembership entry for the creator
+        # Create a TeamMembership entry for the creator with owner role
         TeamMembership.objects.create(
             user=self.request.user,
             team=team,
             role='owner'
         )
 
+    def perform_destroy(self, instance):
+        """Only allow team owners to delete teams.
+        Raises PermissionDenied if non-owner attempts deletion."""
+        # Check if the requesting user is the owner
+        is_owner = TeamMembership.objects.filter(
+            user=self.request.user, 
+            team=instance, 
+            role='owner'
+        ).exists()
+        
+        if is_owner:
+            instance.delete()
+        else:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only team owners can delete a team.")
+
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def invite_member(self, request, pk=None):
+        """
+        Invite a user to a team.
+        Handles:
+        - Permission checking (only owners can invite)
+        - Email validation
+        - Sends email notification to invited user
+        - Creates TeamMembership record
+        """
         team = self.get_object()
         email = request.data.get('email')
-        role = request.data.get('role', 'member')
+        role = request.data.get('role', 'member')  # Default role is 'member'
 
+        # Check if the requesting user is a team owner
+        try:
+            membership = TeamMembership.objects.get(team=team, user=request.user)
+            if membership.role != 'owner':
+                return Response({'error': 'Only team owners can invite members.'}, status=status.HTTP_403_FORBIDDEN)
+        except TeamMembership.DoesNotExist:
+            return Response({'error': 'You are not a member of this team.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Validate the role
         if role not in dict(TeamMembership.ROLE_CHOICES):
             return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Validate email input
         if not email:
             return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Find the user by email
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
@@ -91,10 +131,10 @@ class TeamViewSet(viewsets.ModelViewSet):
         if TeamMembership.objects.filter(user=user, team=team).exists():
             return Response({'error': 'User is already a member of the team'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Add the user to the team
+        # Add the user to the team with specified role
         TeamMembership.objects.create(user=user, team=team, role=role)
 
-        # Send an email notification
+        # Send an email notification to invited user
         current_site = get_current_site(request)
         mail_subject = 'Team Invitation'
         message = f'Hi {user.name},\n\nYou have been added to the team {team.name} on SOPify.\n\nYou can now access the team and start collaborating.\n\nBest regards,\n{current_site.domain}'
@@ -106,7 +146,7 @@ class TeamViewSet(viewsets.ModelViewSet):
             fail_silently=False,
         )
 
-        return Response({'message': 'Invitation sent and user added to the team'}, status=status.HTTP_200_OK)   
+        return Response({'message': 'Invitation sent and user added to the team'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'], url_path='users-in-same-team')
     def users_in_same_team(self, request, pk=None):
@@ -129,7 +169,6 @@ class TeamViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_member_role(self, request, pk=None):
         """ Allow only the team owner to update a member’s role. """
-
 
         team = self.get_object()
 
@@ -190,24 +229,90 @@ class IsTeamOwner(BasePermission):
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all()
+    """ViewSet for managing tasks with proper filtering"""
     serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAssignedUser]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Task.objects.filter(
-            Q(assigned_to=user) | 
-            Q(team__team_memberships__user=user)
-        ).distinct()
+    permission_classes = [IsAuthenticated, IsTeamMemberOrTaskOwner]
     
-    @action(detail=False, methods=['get'], url_path='user-and-team-tasks', permission_classes=[IsAuthenticated])
+    def get_queryset(self):
+        """
+        Get tasks with filtering by query parameters:
+        - status: Filter by task status
+        - team: Filter by team ID
+        - assigned_to: Filter by assigned user ID
+        """
+        user = self.request.user
+        queryset = Task.objects.all()
+        
+        # Filter by status
+        status_param = self.request.query_params.get('status', None)
+        if status_param is not None:
+            queryset = queryset.filter(status=status_param)
+        
+        # Filter by team
+        team_param = self.request.query_params.get('team', None)
+        if team_param is not None:
+            queryset = queryset.filter(team_id=team_param)
+        
+        # Filter by assigned_to
+        assigned_to_param = self.request.query_params.get('assigned_to', None)
+        if assigned_to_param is not None:
+            if assigned_to_param.lower() == 'null':
+                # Handle case for unassigned tasks
+                queryset = queryset.filter(assigned_to__isnull=True)
+            else:
+                queryset = queryset.filter(assigned_to_id=assigned_to_param)
+                
+        # Filter by due date range
+        due_before = self.request.query_params.get('due_before', None)
+        if due_before is not None:
+            queryset = queryset.filter(due_date__lte=due_before)
+            
+        due_after = self.request.query_params.get('due_after', None)
+        if due_after is not None:
+            queryset = queryset.filter(due_date__gte=due_after)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        team = serializer.validated_data.get('team')
+        assigned_to = serializer.validated_data.get('assigned_to')
+
+        if team:
+            try:
+                membership = TeamMembership.objects.get(user=user, team=team)
+            except TeamMembership.DoesNotExist:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You are not a member of the selected team.")
+
+            # Only allow assigning to others if requester is team owner
+            if assigned_to and assigned_to != user:
+                if membership.role != 'owner':
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("Only team owners can assign tasks to other members.")
+
+        serializer.save()
+    
+    @action(detail=False, methods=['get'], url_path='user-and-team-tasks')
     def user_and_team_tasks(self, request):
         user = request.user
+
+        # All tasks assigned to the current user (personal or team-based)
         user_tasks = Task.objects.filter(assigned_to=user)
-        team_tasks = Task.objects.filter(team__team_memberships__user=user).exclude(assigned_to=user)
+
+        # All team tasks in user's teams NOT assigned to the user
+        user_teams = Team.objects.filter(members=user)
+        team_tasks = Task.objects.filter(team__in=user_teams).exclude(assigned_to=user)
+
+        # Optional status filter
+        status_param = request.query_params.get('status')
+        if status_param:
+            user_tasks = user_tasks.filter(status=status_param)
+            team_tasks = team_tasks.filter(status=status_param)
+
         user_tasks_serializer = TaskSerializer(user_tasks, many=True)
         team_tasks_serializer = TaskSerializer(team_tasks, many=True)
+
         return Response({
             'user_tasks': user_tasks_serializer.data,
             'team_tasks': team_tasks_serializer.data
@@ -222,164 +327,424 @@ class UsersInSameTeamView(generics.ListAPIView):
         return UserAccount.objects.filter(team_memberships__team_id=team_id)
     
 
+class GoogleDriveLoginView(View):
+    def get(self, request, *args, **kwargs):
+        """
+        Initiate OAuth flow with Google Drive.
+        """
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        gauth.LoadClientConfigFile(settings.GOOGLE_CLIENT_SECRETS_FILE)
 
-class OneDriveLoginView(APIView):
-    permission_classes = [IsAuthenticated]
+        # Force the correct web-based flow
+        gauth.GetFlow()
+        gauth.flow.redirect_uri = "http://localhost:8000/api/google-drive/callback/"  # This must match the authorized redirect URI
+        auth_url = gauth.flow.step1_get_authorize_url()
+        #return redirect(auth_url)
+        return JsonResponse({ "auth_url": auth_url })
 
-    def get(self, request):
-
-        if not request.user.is_authenticated:
-            return JsonResponse({"error": "User is not authenticated"}, status=401)
-
-        params = {
-            "client_id": settings.ONEDRIVE_CLIENT_ID,
-            "response_type": "code",
-            "redirect_uri": settings.ONEDRIVE_REDIRECT_URI,
-            "scope": "Files.Read.All Files.ReadWrite.All offline_access User.Read",
-            "response_mode": "query",
-        }
-        auth_url = f"{settings.ONEDRIVE_AUTH_URL}?{urllib.parse.urlencode(params)}"
-
-        return JsonResponse({"auth_url": auth_url})
-    
-
-    
-
-class OneDriveCallbackView(APIView):
-    permission_classes = []  # No authentication needed here
-
-    def get(self, request):
-        print("📢 OneDrive Callback triggered!")  # Debug
-
-        code = request.GET.get("code")
-        if not code:
-            print("❌ No code provided!")  # Debugging
-            return JsonResponse({"error": "No authorization code provided"}, status=400)
-
-        print("✅ Received OneDrive authorization code!")  # Debug
-
-        token_data = {
-            "client_id": settings.ONEDRIVE_CLIENT_ID,
-            "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": settings.ONEDRIVE_REDIRECT_URI,
-        }
-
-        response = requests.post(settings.ONEDRIVE_TOKEN_URL, data=token_data)
-        token_json = response.json()
-
-        logger.info("OneDrive Token Response: %s", token_json)
-        print("📢 OneDrive Token Response:", token_json)  # Debugging
-
-        if "access_token" in token_json:
-            access_token = token_json["access_token"]
-            refresh_token = token_json.get("refresh_token")
-            print("📢 OneDrive Access Token Response:", access_token)  # Debugging
-
-            response = JsonResponse({"success": True})
-            response.set_cookie(
-                "onedrive_access_token",
-                access_token,
-                httponly=True,
-                secure=False,  # Set to True in production (requires HTTPS)
-                samesite="Lax",
-            )
-            response.set_cookie(
-                "onedrive_refresh_token",
-                refresh_token,
-                httponly=True,
-                secure=False,  # Set to True in production (requires HTTPS)
-                samesite="Lax",
-            )
-
-            print("🚀 Redirecting to frontend...")
-            return redirect("http://localhost:3000/view/documents")  # Redirect
-
-        print("❌ OneDrive authentication failed!")
-        return JsonResponse({"error": "Failed to authenticate"}, status=400)
-
-
-class OneDriveRefreshTokenView(APIView):
-    permission_classes = []
-
-    def post(self, request):
-        refresh_token = request.COOKIES.get("onedrive_refresh_token")
-        if not refresh_token:
-            return Response({"error": "No refresh token found"}, status=401)
-
-        token_data = {
-            "client_id": settings.ONEDRIVE_CLIENT_ID,
-            "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-        }
-
-        response = requests.post(settings.ONEDRIVE_TOKEN_URL, data=token_data)
-        token_json = response.json()
-
-        if "access_token" in token_json:
-            response = JsonResponse({"access_token": token_json["access_token"]})
-            response.set_cookie(
-                "onedrive_access_token",
-                token_json["access_token"],
-                httponly=True,
-                secure=False,
-                samesite="Lax",
-            )
-            return response
-
-        return Response({"error": "Failed to refresh token"}, status=400)
-
-class OneDriveUploadView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        title = request.data.get('title')
-        content = request.data.get('content')
-        team_id = request.data.get('team_id')
-        team = get_object_or_404(Team, id=team_id)
-
-        print("📢 Headers:", request.headers)  # Debugging
-
-        # Upload file to OneDrive
-        access_token = request.headers.get("onedrive_access_token")
-        if not access_token:
-            return Response({"error": "No OneDrive access token found"}, status=401)
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/octet-stream"
-        }
-        upload_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/Documents/{title}.txt:/content"
+class GoogleDriveCallbackView(View):
+    def get(self, request, *args, **kwargs):
+        """
+        Handles the OAuth callback from Google, exchanges the code for credentials,
+        and stores the credentials in the session.
+        """
+        code = request.GET.get('code')
+        redirect_url = request.GET.get('state', '') or 'http://localhost:3000/view/documents'
         
-        response = requests.put(upload_url, headers=headers, data=content.encode('utf-8'))
-        response_json = response.json()
+        if not code:
+            return HttpResponse("Error: No authorization code provided", status=400)
+        
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        
+        # Exchange the code for credentials
+        gauth.Auth(code=code)
+        
+        # Save the credentials (as JSON) in the session
+        request.session['google_drive_credentials'] = gauth.credentials.to_json()
+        
+        return redirect("http://localhost:3000/google-auth-callback?drive_auth=success")
 
-        if response.status_code == 201:
-            # Save document metadata in the database
+class ListDriveFilesView(View):
+    def get(self, request, *args, **kwargs):
+        creds_json = request.session.get('google_drive_credentials')
+        if not creds_json:
+            return HttpResponse("Not authenticated with Google Drive", status=401)
+        
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        
+        # Load the credentials using from_json, which returns an OAuth2Credentials instance.
+        credentials = OAuth2Credentials.from_json(creds_json)
+        gauth.credentials = credentials
+        
+        drive = GoogleDrive(gauth)
+        file_list = drive.ListFile({'q': "'root' in parents and trashed=false"}).GetList()
+        files = [{"id": f['id'], "title": f['title']} for f in file_list]
+        
+        return JsonResponse({"files": files})
+    
+class GoogleDriveUploadView(APIView):
+    """API endpoint for uploading documents to Google Drive."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Handle POST request to upload a document to Google Drive."""
+        try:
+            # Get form data
+            title = request.data.get('title')
+            team_id = request.data.get('team_id', None)
+            file_obj = request.FILES.get('file')
+            text_content = request.data.get('text_content')
+            content_type = request.data.get('content_type')  # HTML or plain text
+            review_date = request.data.get('review_date')
+            
+            # Validate input
+            if not title:
+                return Response({"error": "Title is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not file_obj and not text_content:
+                return Response({"error": "You must provide either a file or text content."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if the user belongs to the specified team
+            team, error_response = validate_team_membership(request.user, team_id)
+            if error_response:
+                return error_response
+            
+            # Get Google Drive credentials from session
+            creds_json = request.session.get('google_drive_credentials')
+            if not creds_json:
+                return Response({"error": "Not authenticated with Google Drive."}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Upload document to Google Drive using service class
+            try:
+                drive_service = GoogleDriveService(creds_json)
+                result = drive_service.upload_document(
+                    title=title,
+                    text_content=text_content,
+                    file_obj=file_obj,
+                    content_type=content_type
+                )
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Save metadata to database
             document = Document.objects.create(
                 title=title,
-                file_url=response_json['webUrl'],
+                file_url=result['file_url'],
+                google_drive_file_id=result['file_id'],
                 owner=request.user,
-                team=team
+                team=team,
+                review_date=review_date if review_date else None
             )
+            
+            # Return the created document data
             serializer = DocumentSerializer(document)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response({"error": "Upload to OneDrive failed", "details": response_json}, status=response.status_code)
+            
+        except Exception as e:
+            # Log the error and return a server error response
+            logger.error("Error in GoogleDriveUploadView: %s", e, exc_info=True)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class DocumentViewSet(viewsets.ModelViewSet):
-    queryset = Document.objects.all()
+class GenerateSOPView(APIView):
+    """
+    API endpoint for generating SOPs using OpenAI GPT.
+    
+    Takes a user prompt and returns AI-generated SOP content.
+    Requires authentication.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Handle POST request to generate an SOP using AI."""
+        # Get the prompt from the request data
+        prompt = request.data.get('prompt')
+        if not prompt:
+            return Response({'error': 'Prompt is required.'}, status=400)
+
+        try:
+            # Initialize OpenAI client with API key from settings
+            client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+            # Call the OpenAI API with SOP generation prompt
+            completion = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    # System message with SOP format instructions
+                    {"role": "developer", "content": GENERATION_PROMPT},
+                    # User's specific request
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7, # Moderate creativity
+                max_tokens=1000 # Limit response length
+            )
+
+            # Extract the generated text from the response
+            sop_text = completion.choices[0].message.content
+            return Response({"sop": sop_text})
+
+        except Exception as e:
+             # Return error message if OpenAI API call fails
+            return Response({"error": f"OpenAI error: {str(e)}"}, status=500)
+
+
+class SummariseSOPView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        content = request.data.get('content', '')
+        if not content:
+            return Response({'error': 'No content provided'}, status=400)
+
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Summarise the following SOP as clearly and concisely as possible."},
+                {"role": "user", "content": content}
+            ],
+            max_tokens=300
+        )
+        summary = response.choices[0].message.content
+        return Response({'summary': summary})
+
+
+class ImproveSOPView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        content = request.data.get('content', '')
+        if not content:
+            return Response({'error': 'No content provided.'}, status=400)
+
+        try:
+            client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+            completion = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that improves Standard Operating Procedures (SOPs) for clarity, formality, and tone."},
+                    {"role": "user", "content": f"Please improve this SOP:\n\n{content}"}
+                ],
+                temperature=0.7,
+                max_tokens=1500
+            )
+
+            improved = completion.choices[0].message.content
+            return Response({"improved": improved})
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+
+
+class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
+    
     serializer_class = DocumentSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAssignedUser]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        return Document.objects.filter(team__team_memberships__user=user) | Document.objects.filter(owner=user)
+        
+        return Document.objects.filter(
+            Q(team__in=user.teams.all()) | 
+            Q(owner=user, team__isnull=True))
+    
+    @action(detail=False, methods=['get'], url_path='team/(?P<team_id>\d+)')
+    def team_documents(self, request, team_id=None):
+        """Get all documents for a specific team"""
+        team = get_object_or_404(Team, id=team_id)
+        documents = Document.objects.filter(team=team)
+        serializer = DocumentSerializer(documents, many=True)
+        return Response(serializer.data)
+    
+class GoogleDriveFileContentView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+    def get(self, request, document_id):
+        """ Retrieve content from a Google Doc and return as plain text. """
+        document = get_object_or_404(Document, id=document_id)
+        file_id = document.google_drive_file_id
+
+        # Check permissions for team documents
+        if document.team:
+            try:
+                # Verify team membership (all members including admins can view)
+                if not TeamMembership.objects.filter(
+                    team=document.team, 
+                    user=request.user
+                ).exists():
+                    return Response(
+                        {"error": "You don't have permission to view this document."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            except Exception as e:
+                logger.error("Permission check error: %s", e)
+                return Response(
+                    {"error": "Error checking permissions."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        # For personal documents, only the owner can view
+        elif document.owner != request.user:
+            return Response(
+                {"error": "You don't have permission to view this document."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if not file_id:
+            return Response({"error": "Document does not have an associated Google Drive file ID."}, status=400)
+
+        # Load stored credentials from session.
+        creds_json = request.session.get('google_drive_credentials')
+        if not creds_json:
+            return Response({"error": "Not authenticated with Google Drive."}, status=401)
+
+        try:
+            credentials = OAuth2Credentials.from_json(creds_json)
+        except Exception as e:
+            logger.error("Failed to load credentials: %s", e, exc_info=True)
+            return Response({"error": "Invalid Google Drive credentials."}, status=400)
+
+        # Prepare PyDrive2 authentication
+        gauth = GoogleAuth()
+        gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+        gauth.credentials = credentials
+        drive = GoogleDrive(gauth)
+
+        # Fetch file metadata, ensuring we get the export links
+        gfile = drive.CreateFile({'id': file_id})
+        gfile.FetchMetadata(fields='id, title, mimeType, modifiedDate, exportLinks')
+
+        # Update document metadata in your DB
+        document.title = gfile['title']
+
+        # Update `updated_at` using modifiedDate from Google (parse it into Django datetime format)
+        if 'modifiedDate' in gfile:
+            document.updated_at = parse_datetime(gfile['modifiedDate'])
+
+        document.save(update_fields=['title', 'updated_at'])
+
+        # Check if the file is a Google Doc
+        if gfile.get('mimeType') != 'application/vnd.google-apps.document':
+            return Response({"error": "This API only supports Google Docs files."}, status=400)
+
+        # Fetch the export link for html, plain text removes formatting
+        export_links = gfile.get('exportLinks', {})
+        html_export_link = export_links.get('text/html')
+
+        if not html_export_link:
+            logger.error("No HTML export link available for this Google Doc.")
+            return Response({"error": "Unable to export Google Doc as HTML."}, status=500)
+
+        # Download the document content
+        try:
+            response = requests.get(html_export_link)
+            response.raise_for_status()  # Raise an error for failed HTTP responses
+            content = response.text
+        except Exception as e:
+            logger.error("Failed to download Google Docs HTML content: %s", e, exc_info=True)
+            return Response({"error": "Failed to retrieve document content."}, status=500)
+
+        return Response({"title":document.title, "content": content, "file_url": document.file_url}, status=200)
+
+class DocumentDeleteView(APIView):
+    """API endpoint for deleting documents."""
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, document_id):
+        """Handle DELETE request to remove a document."""
+        # Get document or return 404
+        document = get_object_or_404(Document, id=document_id)
+        
+        # Check permissions based of if team or personal document
+        if document.team:
+            try:
+                # For team documents, check if user is a member of this team
+                membership = TeamMembership.objects.get(team=document.team, user=request.user)
+                
+                # Only team owners or the document creator can delete documents
+                if membership.role != 'owner' and document.owner != request.user:
+                    return Response(
+                        {'error': 'Only team owners or the document creator can delete team documents.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                    
+            except TeamMembership.DoesNotExist:
+                # User is not a team member
+                return Response(
+                    {'error': 'You are not a member of this team.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        # For personal documents, only the owner can delete
+        elif document.owner != request.user:
+            return Response(
+                {'error': 'You do not have permission to delete this document.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # user has permission to delete the document
+        try:
+            # Delete from Google Drive
+            gauth = GoogleAuth()
+            drive = GoogleDrive(gauth)
+            file1 = drive.CreateFile({'id': document.google_drive_file_id})
+            file1.Delete()
+            
+            # Delete from database
+            document.delete()
+
+            # Return success (204 No Content is standard for successful DELETE)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Return error response if deletion fails
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Update DocumentPermission class
+
+class DocumentPermission(permissions.BasePermission):
+    """Custom permission for document operations"""
+    
+    def has_permission(self, request, view):
+        """Check if the user is authenticated for any document operation"""
+        return request.user.is_authenticated
+    
+    def has_object_permission(self, request, view, obj):
+        """Determine if the user has permission for the specific document."""
+        # Check if user is the document owner
+        if obj.owner == request.user:
+            return True
+            
+        # Check if document belongs to a team
+        if obj.team:
+            # Check user's role in the team
+            try:
+                membership = TeamMembership.objects.get(team=obj.team, user=request.user)
+                
+                # Admin users can only use safe methods (GET, HEAD, OPTIONS)
+                if membership.role == 'admin' and request.method in permissions.SAFE_METHODS:
+                    return True
+                
+                # Member and owner roles can use safe methods
+                if request.method in permissions.SAFE_METHODS:
+                    return True
+                    
+                # Allow editing for members and owners
+                if request.method in ['PUT', 'PATCH'] and membership.role in ['member', 'owner']:
+                    return True
+                    
+                # Allow deletion only for owners and document creator
+                if request.method == 'DELETE':
+                    if membership.role == 'owner' or obj.owner == request.user:
+                        return True
+                    
+                return False
+            except TeamMembership.DoesNotExist:
+                return False
+                
+        # If document doesn't belong to a team, only owner can access
+        return obj.owner == request.user
 
 

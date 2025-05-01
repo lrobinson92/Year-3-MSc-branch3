@@ -5,7 +5,6 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path("api/", include("sop.urls")),
-    path("onedrive/", include("sop.urls")),
     path("auth/jwt/create/", CustomTokenObtainPairView.as_view(), name="jwt-create"),
     path("auth/jwt/refresh/", TokenRefreshView.as_view(), name="jwt-refresh"),
     path("auth/logout/", LogoutView.as_view(), name='logout'),

@@ -1,19 +1,45 @@
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.utils.deprecation import MiddlewareMixin
-from django.http import HttpResponse
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed
+from django.http import JsonResponse
 
 class JWTAuthenticationMiddleware(MiddlewareMixin):
+    """
+    Custom middleware for JWT authentication that allows specific paths
+    to bypass authentication checks (like registration endpoints).
+    """
     def process_request(self, request):
-        # Exempt these URLs from authentication
-        if request.path in ["/onedrive/callback/", "/auth/jwt/create/", "/auth/jwt/refresh/"]: # Added the refresh
-            return None # Continue with request
+        # Skip authentication for specific paths
+        public_paths = [
+            '/auth/users/',               # Registration
+            '/auth/users/activation/',    # Account activation
+            '/auth/jwt/create/',          # Login
+            '/auth/users/reset_password/' # Password reset
+        ]
         
-        auth = JWTAuthentication()
-        header = auth.get_header(request)
-        
-        if header is None:
-            raw_token = request.COOKIES.get("access_token")
-            if raw_token:
-                request.META["HTTP_AUTHORIZATION"] = f"Bearer {raw_token}"
+        # Skip authentication for public paths
+        for path in public_paths:
+            if request.path.startswith(path):
+                return None
 
-        return None # Continue with request
+        # Skip OPTIONS requests (for CORS preflight)
+        if request.method == 'OPTIONS':
+            return None
+            
+        # Skip authentication if the user is already authenticated
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            return None
+            
+        # Try to authenticate with JWT
+        try:
+            jwt_authenticator = JWTAuthentication()
+            user_auth_tuple = jwt_authenticator.authenticate(request)
+            if user_auth_tuple:
+                # Store the authenticated user in the request
+                request.user, _ = user_auth_tuple
+        except (InvalidToken, AuthenticationFailed):
+            # Continue processing if there's no valid token
+            # This allows unauthenticated access to public paths
+            pass
+            
+        return None

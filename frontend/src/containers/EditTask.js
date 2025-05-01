@@ -3,51 +3,58 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { connect } from 'react-redux';
 import axiosInstance from '../utils/axiosConfig';
 import { FaArrowLeft } from 'react-icons/fa';
-import { editTask } from '../actions/task';
+import { getTaskDetails, updateTask, fetchTeamMembers } from '../actions/task';
+import { fetchTeams } from '../actions/team';
 
-const EditTask = ({ isAuthenticated, user, editTask }) => {
+/**
+ * EditTask Component - Form for editing existing tasks
+ * Allows users to modify task details if they have permission
+ */
+const EditTask = ({ 
+    isAuthenticated, 
+    user, 
+    updateTask, 
+    getTaskDetails,
+    fetchTeams,
+    fetchTeamMembers,
+    teams,
+    teamMembers,
+    currentTask,
+    loading
+}) => {
+    // Get task ID from URL parameters
     const { id } = useParams();
     const navigate = useNavigate();
 
+    // Form state for task data
     const [formData, setFormData] = useState({
         description: '',
-        assigned_to: '',
+        assigned_to: user ? user.id : '',
         team: '',
         due_date: '',
         status: 'not_started',
     });
-    const [teams, setTeams] = useState([]);
-    const [filteredUsers, setFilteredUsers] = useState([]);
+    
+    // Permission state - determines if user can edit this task
     const [canEdit, setCanEdit] = useState(false);
 
+    // Destructure form fields for easier access
     const { description, assigned_to, team, due_date, status } = formData;
 
+    /**
+     * Fetch task data and teams when component loads
+     * Determine if the current user has permission to edit
+     */
     useEffect(() => {
-        const fetchTaskAndData = async () => {
+        const fetchTaskData = async () => {
             try {
-                // Cookies are automatically sent in requests because `withCredentials: true` is enabled.
-                const taskListURL = `${process.env.REACT_APP_API_URL}/api/tasks/user-and-team-tasks/`;
-                const teamsURL = `${process.env.REACT_APP_API_URL}/api/teams/`;
-        
-                const [tasksRes, teamsRes] = await Promise.all([
-                    axiosInstance.get(taskListURL),
-                    axiosInstance.get(teamsURL),
-                ]);
-        
-                // 🔥 Find the task with the correct ID
-                const allTasks = [...tasksRes.data.user_tasks, ...tasksRes.data.team_tasks];
-                const taskData = allTasks.find(task => task.id === parseInt(id));
-        
-                if (!taskData) {
-                    console.error("❌ Task not found in response.");
-                    return;
-                }
-
-                console.log("🔍 Task Data:", taskData);
-                console.log("🔍 Task Assigned To:", taskData.assigned_to);
-                console.log("🔍 Setting Assigned To: ", taskData.assigned_to ? taskData.assigned_to.toString() : '');
-
-                // ✅ Populate the form with task data
+                // Get task details from Redux action
+                const taskData = await getTaskDetails(id);
+                
+                // Get teams list
+                await fetchTeams();
+                
+                // Populate form with task data
                 setFormData({
                     description: taskData.description || '',
                     assigned_to: taskData.assigned_to ? taskData.assigned_to.toString() : '',
@@ -55,51 +62,84 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                     due_date: taskData.due_date || '',
                     status: taskData.status || 'not_started',
                 });
-        
-                setTeams(Array.isArray(teamsRes.data) ? teamsRes.data : []);
-
+                
+                // Check if user has permission to edit this task
+                // User can edit if they're the assigned person or team owner
                 const isAssignedUser = taskData.assigned_to === user.id;
-                const isOwner = teamsRes.data.some(team => 
-                    team.id === taskData.team && 
-                    team.members.some(membership => membership.user === user.id && membership.role === 'owner')
-                );
-                setCanEdit(isAssignedUser || isOwner);
-        
-            } catch (err) {
-                console.error('❌ Failed to fetch task or teams:', err);
-            }
-        };
-        
-
-
-        fetchTaskAndData();
-    }, [id, user.id]);
-
-    useEffect(() => {
-        // Fetch users based on the selected team
-        const fetchUsers = async () => {
-            if (team) {
-                try {
-                    const usersRes = await axiosInstance.get(`${process.env.REACT_APP_API_URL}/api/teams/${team}/users-in-same-team/`, { withCredentials: true });
-                    console.log('Fetched users:', usersRes.data); // Debugging log
-                    setFilteredUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
-                } catch (err) {
-                    console.error('Failed to fetch users:', err);
+                const isTeamOwner = taskData.team && user.teams && 
+                    user.teams.some(team => 
+                        team.id === taskData.team && 
+                        team.role === 'owner'
+                    );
+                
+                setCanEdit(isAssignedUser || isTeamOwner);
+                
+                // If task belongs to a team, fetch team members
+                if (taskData.team) {
+                    fetchTeamMembers(taskData.team, user.id);
                 }
-            } else {
-                setFilteredUsers(user ? [user] : []);
+                
+            } catch (err) {
+                console.error('Failed to fetch task or teams:', err);
             }
         };
 
-        fetchUsers();
-    }, [team, user]);
+        if (user && id) {
+            fetchTaskData();
+        }
+    }, [id, user, getTaskDetails, fetchTeams, fetchTeamMembers]);
 
-    const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    /**
+     * Fetch team members when team selection changes
+     */
+    useEffect(() => {
+        if (user && team) {
+            fetchTeamMembers(team, user.id);
+        } else if (user) {
+            // For personal tasks, just set the current user
+            setFormData(prev => ({
+                ...prev,
+                assigned_to: user.id.toString()
+            }));
+        }
+    }, [team, user, fetchTeamMembers]);
 
+    /**
+     * Handle form field changes
+     * Special handling for team field to reset assigned_to when team changes
+     */
+    const onChange = (e) => {
+        const { name, value } = e.target;
+        
+        if (name === 'team') {
+            setFormData({ 
+                ...formData, 
+                [name]: value,
+                // Reset assigned_to when team changes
+                assigned_to: value ? '' : (user ? user.id : '')
+            });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
+    };
+
+    /**
+     * Form submission handler
+     */
     const onSubmit = async (e) => {
         e.preventDefault();
         try {
-            await editTask(id, description, assigned_to, team, due_date, status);
+            // Create task data object for API
+            const taskData = {
+                description,
+                assigned_to,
+                team: team || null,
+                due_date,
+                status
+            };
+            
+            // Call Redux action to update the task
+            await updateTask(id, taskData);
             alert("Task updated successfully!");
             navigate('/view/tasks');
         } catch (error) {
@@ -107,18 +147,46 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
         }
     };
 
+    // Navigate back to previous page
+    const handleGoBack = () => {
+        navigate(-1);
+    };
+
+    // Redirect if user is not authenticated
     if (!isAuthenticated) {
         return <Navigate to="/login" />;
     }
 
+    // Show loading state while fetching data
+    if (loading) {
+        return (
+            <div className="container mt-5 text-center">
+                <div className="spinner-border" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mt-5 entry-container">
-            <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/tasks')} />
+            {/* Back button for navigation */}
+            <FaArrowLeft 
+                className="back-arrow" 
+                onClick={handleGoBack} 
+                style={{ cursor: 'pointer' }}
+                title="Go back to previous page" 
+            />
+            
+            {/* Task editing card */}
             <div className="card p-4 mx-auto" style={{ maxWidth: '400px' }}>
                 <div className="d-flex align-items-center mb-4">
                     <h1 className="text-center flex-grow-1 mb-0">Edit Task</h1>
                 </div>
+                
+                {/* Task editing form */}
                 <form onSubmit={onSubmit}>
+                    {/* Task description field */}
                     <div className="form-group mb-3">
                         <label>Description</label>
                         <textarea
@@ -131,8 +199,10 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                             disabled={!canEdit}
                         />
                     </div>
+                    
+                    {/* Team selection */}
                     <div className="form-group mb-3">
-                        <label>Team</label>
+                        <label>Team (Optional)</label>
                         <select
                             className="form-control"
                             name="team"
@@ -140,7 +210,7 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                             onChange={onChange}
                             disabled={!canEdit}
                         >
-                            <option value="">Select Team</option>
+                            <option value="">Personal Task</option>
                             {teams.map(team => (
                                 <option key={team.id} value={team.id}>
                                     {team.name}
@@ -148,6 +218,8 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                             ))}
                         </select>
                     </div>
+                    
+                    {/* Assigned user selection */}
                     <div className="form-group mb-3">
                         <label>Assigned To</label>
                         <select
@@ -159,13 +231,20 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                             disabled={!canEdit}
                         >
                             <option value="">Select Member</option>
-                            {filteredUsers.map(user => (
-                                <option key={user.user} value={user.user}>
-                                    {user.user_name}
+                            {/* Show current user if it's a personal task */}
+                            {!team && user && (
+                                <option value={user.id}>{user.name}</option>
+                            )}
+                            {/* Show team members for team tasks */}
+                            {team && teamMembers && teamMembers.map(member => (
+                                <option key={member.user} value={member.user}>
+                                    {member.user_name}
                                 </option>
                             ))}
                         </select>
                     </div>
+                    
+                    {/* Due date selection */}
                     <div className="form-group mb-3">
                         <label>Due Date</label>
                         <input
@@ -178,6 +257,8 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                             disabled={!canEdit}
                         />
                     </div>
+                    
+                    {/* Task status selection */}
                     <div className="form-group mb-3">
                         <label>Status</label>
                         <select
@@ -192,6 +273,8 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
                             <option value="complete">Complete</option>
                         </select>
                     </div>
+                    
+                    {/* Show update button or permission message */}
                     {canEdit ? (
                         <div className="d-flex justify-content-between">
                             <button className="btn btn-primary w-100" type="submit">
@@ -209,9 +292,28 @@ const EditTask = ({ isAuthenticated, user, editTask }) => {
     );
 };
 
+/**
+ * Maps Redux state to component props
+ */
 const mapStateToProps = (state) => ({
     isAuthenticated: state.auth.isAuthenticated,
     user: state.auth.user,
+    teams: state.team.teams || [],
+    teamMembers: state.task.teamMembers || [],
+    currentTask: state.task.currentTask,
+    loading: state.task.loading
 });
 
-export default connect(mapStateToProps, { editTask })(EditTask);
+/**
+ * Connects component to Redux store
+ * Provides actions for task management
+ */
+export default connect(
+    mapStateToProps, 
+    { 
+        updateTask, 
+        getTaskDetails, 
+        fetchTeams,
+        fetchTeamMembers
+    }
+)(EditTask);

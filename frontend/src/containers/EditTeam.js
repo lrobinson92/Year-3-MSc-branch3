@@ -84,42 +84,51 @@ const EditTeam = ({ editTeam, updateMemberRole, removeMember, user, teams }) => 
         }
     };
 
+    const handleGoBack = () => {
+        navigate(-1); // This navigates back one step in history
+    };
+
     if (loading) {
         return <div>Loading...</div>;
     }
 
     return (
         <div className='container mt-5 entry-container'>
-            <FaArrowLeft className="back-arrow" onClick={() => navigate('/view/teams')} />
+            <FaArrowLeft 
+                            className="back-arrow" 
+                            onClick={handleGoBack} 
+                            style={{ cursor: 'pointer' }}
+                            title="Go back to previous page" 
+                        />
             <div className="card p-4 mx-auto" style={{ maxWidth: '500px' }}>
                 <h1 className="text-center mb-4">Edit Team</h1>
-                <form onSubmit={onSubmit}>
-                    <div className="form-group mb-3">
-                        <input
-                            className='form-control'
-                            type='text'
-                            placeholder='Team Name*'
-                            name='name'
-                            value={name}
-                            onChange={onChange}
-                            required
-                        />
-                    </div>
-                    <div className='form-group mb-3'>
-                        <textarea
-                            className='form-control'
-                            placeholder='Description'
-                            name='description'
-                            value={description}
-                            onChange={onChange}
-                        />
-                    </div>
-                    <button className="btn btn-primary w-100 mb-3" type='submit'>Update Team</button>
-                </form>
+                
+                {/* Form inputs remain in place, but without the submit button */}
+                <div className="form-group mb-3">
+                    <input
+                        className='form-control'
+                        type='text'
+                        placeholder='Team Name*'
+                        name='name'
+                        value={name}
+                        onChange={onChange}
+                        required
+                    />
+                </div>
+                <div className='form-group mb-3'>
+                    <textarea
+                        className='form-control'
+                        placeholder='Description'
+                        name='description'
+                        value={description}
+                        onChange={onChange}
+                    />
+                </div>
 
-                {isOwner && (
-                    <div className="mt-4">
-                        <h3>Team Members</h3>
+                {/* Team members section */}
+                <div className="mt-4 mb-4">
+                    <h3>Team Members</h3>
+                    {isOwner ? (
                         <ul className="list-group">
                             {members.map(member => (
                                 <li key={member.user} className="list-group-item d-flex justify-content-between align-items-center">
@@ -137,8 +146,22 @@ const EditTeam = ({ editTeam, updateMemberRole, removeMember, user, teams }) => 
                                 </li>
                             ))}
                         </ul>
-                    </div>
-                )}
+                    ) : (
+                        <ul className="list-group">
+                            {members.map(member => (
+                                <li key={member.user} className="list-group-item d-flex justify-content-between align-items-center">
+                                    {member.user_name}
+                                    <span className="badge bg-secondary">{member.role.charAt(0).toUpperCase() + member.role.slice(1)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                {/* Submit button moved to the bottom */}
+                <form onSubmit={onSubmit} data-testid="edit-team-form">
+                    <button className="btn btn-primary w-100 mb-3" type='submit'>Update Team</button>
+                </form>
             </div>
         </div>
     );
