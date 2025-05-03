@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { FaEye, FaEdit, FaTrash, FaEllipsisV } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
 import { Dropdown, Toast, ToastContainer } from 'react-bootstrap';
 import { deleteDocument } from '../actions/googledrive';
 import CustomToggle from '../utils/customToggle';
@@ -56,20 +56,12 @@ const DocumentGrid = ({
     e.stopPropagation(); // Prevent triggering document click event
     
     // User confirmation before deletion
-    if (!window.confirm(`Are you sure you want to delete "${doc.title || doc.name}"?`)) {
-      return;
-    }
-    
-    // If actions provides a custom delete handler, use that
     if (actions.onDelete) {
+      // Let the custom handler manage its own notifications
       actions.onDelete(doc);
-      // Show toast notification for custom handler too
-      setToastMessage(`"${doc.title || doc.name}" has been deleted`);
-      setShowToast(true);
       return;
     }
     
-    // Otherwise use the Redux action
     const success = await deleteDocument(doc.id);
     
     if (success) {

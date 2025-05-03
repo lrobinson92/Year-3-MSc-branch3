@@ -8,7 +8,8 @@ import {
   generateSOP, 
   createDocument, 
   improveSOP, 
-  summarizeSOP 
+  summarizeSOP,
+  clearSummary 
 } from '../actions/googledrive';
 import { fetchTeams } from '../actions/team';
 import { FaArrowLeft, FaCalendarAlt } from 'react-icons/fa';
@@ -28,6 +29,7 @@ const CreateDocument = ({
   createDocument,
   improveSOP,
   summarizeSOP,
+  clearSummary,
   driveLoggedIn,
   fetchTeams,
   improvingSOP,
@@ -394,17 +396,24 @@ const CreateDocument = ({
                 <button
                   className="btn btn-outline-primary btn-sm"
                   onClick={() => {
+                    // Insert the summary
                     const quill = quillRef.current.getEditor();
                     const summaryDelta = quill.clipboard.convert(`<h2>Summary:</h2><p>${summary}</p><br/><br/>`);
                     const current = quill.getContents();
                     quill.setContents([...summaryDelta.ops, ...current.ops]);
+                    
+                    // Use the dedicated clear action instead
+                    clearSummary();
                   }}
                 >
                   Insert at Top
                 </button>
                 <button
                   className="btn btn-outline-secondary btn-sm"
-                  onClick={() => {}}
+                  onClick={() => {
+                    // Use the dedicated clear action
+                    clearSummary();
+                  }}
                 >
                   Dismiss
                 </button>
@@ -528,5 +537,5 @@ const mapStateToProps = (state) => ({
  */
 export default connect(
   mapStateToProps, 
-  { uploadDocument, generateSOP, createDocument, improveSOP, summarizeSOP, fetchTeams }
+  { uploadDocument, generateSOP, createDocument, improveSOP, summarizeSOP, fetchTeams, clearSummary }
 )(CreateDocument);

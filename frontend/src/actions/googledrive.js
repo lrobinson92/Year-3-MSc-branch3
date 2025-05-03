@@ -1,5 +1,4 @@
 import axiosInstance from '../utils/axiosConfig';
-import { marked } from 'marked';
 import mammoth from 'mammoth';
 import { combineShortParagraphs, formatMarkdownToHTML } from '../utils/utils';
 import { 
@@ -21,7 +20,8 @@ import {
   IMPROVE_SOP_FAIL,
   SUMMARIZE_SOP_START,
   SUMMARIZE_SOP_SUCCESS,
-  SUMMARIZE_SOP_FAIL
+  SUMMARIZE_SOP_FAIL,
+  CLEAR_SUMMARY
 } from './types';
 
 /**
@@ -373,6 +373,14 @@ export const improveSOP = (content) => async (dispatch) => {
  * @returns {Object} Result with summary or error message
  */
 export const summarizeSOP = (content) => async (dispatch) => {
+  // When clearing
+  if (!content) {
+    dispatch({
+      type: 'CLEAR_SUMMARY'
+    });
+    return;
+  }
+  
   // Signal processing start
   dispatch({ type: SUMMARIZE_SOP_START });
   
@@ -393,11 +401,20 @@ export const summarizeSOP = (content) => async (dispatch) => {
   } catch (error) {
     dispatch({
       type: SUMMARIZE_SOP_FAIL,
-      payload: error.response?.data || 'Could not summarize SOP'
+      payload: error.message || String(error)
     });
     
-    return { success: false, error: error.response?.data || 'Could not summarize SOP' };
+    return { success: false, error: error.message || String(error) };
   }
+};
+
+/**
+ * Clear the summary from the Redux store
+ */
+export const clearSummary = () => dispatch => {
+    dispatch({
+        type: CLEAR_SUMMARY
+    });
 };
 
 

@@ -1,3 +1,5 @@
+// Disclaimer: Portions of this code were modified from Django and React tutorials to fit the requirements of the project (see requirements tutorials section).
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';

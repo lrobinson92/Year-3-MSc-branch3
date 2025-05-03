@@ -147,7 +147,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated"
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        'rest_framework.authentication.SessionAuthentication',
+    #    'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',        
     ),
     # Override permissions for Djoser registration views
@@ -227,13 +227,13 @@ CORS_ALLOW_HEADERS = [
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True  # Change this in production!
-#CSRF_TRUSTED_ORIGINS = [
-#    'http://localhost:3000', 'http://localhost:8000'  # Add your frontend URL here
-#]
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000', 'http://localhost:8000'  # Add your frontend URL here
+]
 
 
 #CSRF_COOKIE_HTTPONLY = False  # Ensure the frontend can access the cookie
-#CSRF_COOKIE_SECURE = False    # Use True if HTTPS is enabled, in production
+CSRF_COOKIE_SECURE = False    # Use True if HTTPS is enabled, in production
 #CSRF_COOKIE_NAME = 'csrftoken'
 #CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 #CSRF_COOKIE_SAMESITE = 'None'

@@ -15,7 +15,8 @@ import {
     IMPROVE_SOP_FAIL,
     SUMMARIZE_SOP_START,
     SUMMARIZE_SOP_SUCCESS,
-    SUMMARIZE_SOP_FAIL
+    SUMMARIZE_SOP_FAIL,
+    CLEAR_SUMMARY
 } from '../actions/types';
 
 const initialState = {
@@ -127,14 +128,20 @@ export default function(state = initialState, action) {
         case SUMMARIZE_SOP_SUCCESS:
             return {
                 ...state,
-                summarizingSOP: false,
-                summary: payload
+                summary: action.payload || '',
+                summarizingSOP: false
             };
         case SUMMARIZE_SOP_FAIL:
             return {
                 ...state,
                 summarizingSOP: false,
                 error: payload
+            };
+        case CLEAR_SUMMARY:
+            return {
+                ...state,
+                summary: '',
+                summarizingSOP: false
             };
         default:
             return state;

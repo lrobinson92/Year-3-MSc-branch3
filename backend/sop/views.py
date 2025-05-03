@@ -1,3 +1,4 @@
+# Disclaimer: Portions of this code were modified from Django and React tutorials to fit the requirements of the project (see requirements tutorials section).
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sites.shortcuts import get_current_site
@@ -34,16 +35,27 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 # Prompt template for OpenAI API to generate SOPs with the correct format
-GENERATION_PROMPT = """You are creating a professional Standard Operating Procedure.
+GENERATION_PROMPT = """Generate a Standard Operating Procedure (SOP) in a formal manner with relevant sections and detailed steps.
 
-FORMAT:
-TITLE: {title}
-PURPOSE: A clear statement of the SOP's objective
-SCOPE: Define what activities and personnel this covers
-PROCEDURE: Numbered steps in chronological order
-REFERENCES: Related documents or regulations
+The sections should include: Title, Purpose, Scope, Responsibilities, Definitions, Procedure, and References. Each section should be clearly outlined and ordered. 
+Use formal language appropriate for a professional document.
 
-Use concise, direct language with active voice. Include all necessary details without explanations outside this format."""
+# Steps
+
+1. **Title**: Clearly state the title of the procedure.
+2. **Purpose**: Explain the reason for the procedure.
+3. **Scope**: Specify the boundaries of the procedure, including areas and activities it covers.
+4. **Responsibilities**: Identify individuals or teams responsible for executing the procedure.
+5. **Definitions**: Define any specific terms or jargon used.
+6. **Procedure**: Detail each step of the procedure in sequential order. Ensure clarity and precision.
+7. **References**: List any documents or resources that support the procedure.
+
+# Output Format
+The SOP should be formatted in structured paragraphs under each section heading. Use full sentences to ensure clarity.
+
+- Properly format and number each step in the Procedure section for clarity.
+- Adjust language and terminology according to the specific industry or organization where the SOP will be used.
+- Ensure the SOP is comprehensive and can be followed by someone unfamiliar with the process."""
 
 class TeamViewSet(viewsets.ModelViewSet):
     """
@@ -687,16 +699,26 @@ class DocumentDeleteView(APIView):
         
         # user has permission to delete the document
         try:
-            # Delete from Google Drive
+            # Get credentials from session
+            creds_json = request.session.get('google_drive_credentials')
+            if not creds_json:
+                return Response({'error': 'Not authenticated with Google Drive'}, 
+                               status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Load the stored credentials
             gauth = GoogleAuth()
+            gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+            credentials = OAuth2Credentials.from_json(creds_json)
+            gauth.credentials = credentials
+            
+            # Now use the authenticated drive instance
             drive = GoogleDrive(gauth)
             file1 = drive.CreateFile({'id': document.google_drive_file_id})
             file1.Delete()
             
             # Delete from database
             document.delete()
-
-            # Return success (204 No Content is standard for successful DELETE)
+            
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             # Return error response if deletion fails
