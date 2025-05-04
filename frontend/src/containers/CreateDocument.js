@@ -8,7 +8,10 @@ import {
   generateSOP, 
   createDocument, 
   improveSOP, 
-  summarizeSOP 
+  summarizeSOP,
+  clearSummary,
+  clearImprovedContent,
+  clearDocumentError
 } from '../actions/googledrive';
 import { fetchTeams } from '../actions/team';
 import { FaArrowLeft, FaCalendarAlt } from 'react-icons/fa';
@@ -28,6 +31,9 @@ const CreateDocument = ({
   createDocument,
   improveSOP,
   summarizeSOP,
+  clearSummary,
+  clearImprovedContent,
+  clearDocumentError,
   driveLoggedIn,
   fetchTeams,
   improvingSOP,
@@ -68,11 +74,23 @@ const CreateDocument = ({
   };
 
   /**
-   * Load teams when component mounts
+   * Load teams when component mounts and clear data when unmounting
    */
   useEffect(() => {
+    // This will run when the component mounts
     fetchTeams();
-  }, [fetchTeams]);
+
+    // Clear any existing document errors when component mounts
+    clearDocumentError();
+
+    // This will run when the component unmounts
+    return () => {
+      // Clear any improvement data when navigating away
+      clearImprovedContent();
+      clearSummary();
+      clearDocumentError();
+    };
+  }, [fetchTeams, clearImprovedContent, clearSummary, clearDocumentError]);
 
   /**
    * Display any errors from Redux state
@@ -93,8 +111,7 @@ const CreateDocument = ({
   }, [improvedContent, originalContent]);
 
   /**
-   * Handles form submission to create a new document
-   * Validates inputs and sends data to the server
+   * Handle document submission and creation
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -112,24 +129,37 @@ const CreateDocument = ({
 
     // Show loading state during creation
     setCreating(true);
-    
-    // Call Redux action to create the document
-    const result = await createDocument({
-      title,
-      textContent,
-      teamId,
-      reviewDate,
-      setReviewReminder
-    });
-    
-    // Handle response from server
-    if (result.success) {
-      navigate('/view/documents');
-    } else {
-      setError(result.error);
+
+    try {
+      // Call Redux action to create the document
+      const result = await createDocument({
+        title,
+        textContent,
+        teamId: teamId || '',
+        reviewDate,
+        setReviewReminder
+      });
+
+      // Handle response from server
+      if (result.success) {
+        // Clear improved content when document is created successfully
+        clearImprovedContent();
+        
+        // Navigate to the document or team page
+        if (teamId) {
+          navigate(`/team/${teamId}`);
+        } else {
+          navigate('/view/documents');
+        }
+      } else {
+        setError(result.error || 'Failed to create document. Please try again.');
+      }
+    } catch (error) {
+      // Handle error
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setCreating(false);
     }
-    
-    setCreating(false);
   };
 
   /**
@@ -394,17 +424,24 @@ const CreateDocument = ({
                 <button
                   className="btn btn-outline-primary btn-sm"
                   onClick={() => {
+                    // Insert the summary
                     const quill = quillRef.current.getEditor();
                     const summaryDelta = quill.clipboard.convert(`<h2>Summary:</h2><p>${summary}</p><br/><br/>`);
                     const current = quill.getContents();
                     quill.setContents([...summaryDelta.ops, ...current.ops]);
+                    
+                    // Use the dedicated clear action instead
+                    clearSummary();
                   }}
                 >
                   Insert at Top
                 </button>
                 <button
                   className="btn btn-outline-secondary btn-sm"
-                  onClick={() => {}}
+                  onClick={() => {
+                    // Use the dedicated clear action
+                    clearSummary();
+                  }}
                 >
                   Dismiss
                 </button>
@@ -528,5 +565,5 @@ const mapStateToProps = (state) => ({
  */
 export default connect(
   mapStateToProps, 
-  { uploadDocument, generateSOP, createDocument, improveSOP, summarizeSOP, fetchTeams }
+  { uploadDocument, generateSOP, createDocument, improveSOP, summarizeSOP, fetchTeams, clearSummary, clearImprovedContent, clearDocumentError }
 )(CreateDocument);

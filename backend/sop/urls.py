@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import TeamViewSet, UsersInSameTeamView, TaskViewSet, GoogleDriveLoginView, GoogleDriveCallbackView, ListDriveFilesView, GoogleDriveUploadView, DocumentViewSet, GoogleDriveFileContentView, GenerateSOPView, SummariseSOPView, ImproveSOPView, DocumentDeleteView
+from .views import TeamViewSet, UsersInSameTeamView, TaskViewSet, GoogleDriveLoginView, GoogleDriveCallbackView, ListDriveFilesView, GoogleDriveUploadView, DocumentViewSet, GoogleDriveFileContentView, GenerateSOPView, SummariseSOPView, ImproveSOPView, DocumentDeleteView, DocumentReviewDateUpdateView
 
 router = DefaultRouter()
 router.register(r'teams', TeamViewSet, basename='team')
@@ -19,4 +19,5 @@ urlpatterns = [
     path('summarise-sop/', SummariseSOPView.as_view(), name='summarise_sop'),
     path('improve-sop/', ImproveSOPView.as_view(), name='improve_sop'),
     path('documents/<int:document_id>/delete/', DocumentDeleteView.as_view(), name='document-delete'),
+    path('documents/<int:document_id>/update-review/', DocumentReviewDateUpdateView.as_view(), name='update_document_review'),
     ]

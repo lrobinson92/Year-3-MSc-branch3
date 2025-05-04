@@ -271,7 +271,7 @@ export const deleteTask = (taskId) => async dispatch => {
         
         // Also dispatch legacy action type for backward compatibility
         dispatch({
-            type: DELETE_TASK_SUCCESS,
+            type: TASK_DELETE_SUCCESS,
             payload: taskId
         });
         
@@ -286,7 +286,7 @@ export const deleteTask = (taskId) => async dispatch => {
         });
         
         dispatch({
-            type: DELETE_TASK_FAIL,
+            type: TASK_DELETE_FAIL,
             payload: err.response?.data || 'Failed to delete task'
         });
         

@@ -1,3 +1,4 @@
+# Disclaimer: Portions of this code were modified from Django and React tutorials to fit the requirements of the project (see requirements tutorials section).
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sites.shortcuts import get_current_site
@@ -13,7 +14,7 @@ from pydrive2.drive import GoogleDrive
 from oauth2client.client import OAuth2Credentials
 from openai import OpenAI
 from rest_framework import status, generics, viewsets, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -34,16 +35,27 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 # Prompt template for OpenAI API to generate SOPs with the correct format
-GENERATION_PROMPT = """You are creating a professional Standard Operating Procedure.
+GENERATION_PROMPT = """Generate a Standard Operating Procedure (SOP) in a formal manner with relevant sections and detailed steps.
 
-FORMAT:
-TITLE: {title}
-PURPOSE: A clear statement of the SOP's objective
-SCOPE: Define what activities and personnel this covers
-PROCEDURE: Numbered steps in chronological order
-REFERENCES: Related documents or regulations
+The sections should include: Title, Purpose, Scope, Responsibilities, Definitions, Procedure, and References. Each section should be clearly outlined and ordered. 
+Use formal language appropriate for a professional document.
 
-Use concise, direct language with active voice. Include all necessary details without explanations outside this format."""
+# Steps
+
+1. **Title**: Clearly state the title of the procedure.
+2. **Purpose**: Explain the reason for the procedure.
+3. **Scope**: Specify the boundaries of the procedure, including areas and activities it covers.
+4. **Responsibilities**: Identify individuals or teams responsible for executing the procedure.
+5. **Definitions**: Define any specific terms or jargon used.
+6. **Procedure**: Detail each step of the procedure in sequential order. Ensure clarity and precision.
+7. **References**: List any documents or resources that support the procedure.
+
+# Output Format
+The SOP should be formatted in structured paragraphs under each section heading. Use full sentences to ensure clarity.
+
+- Properly format and number each step in the Procedure section for clarity.
+- Adjust language and terminology according to the specific industry or organization where the SOP will be used.
+- Ensure the SOP is comprehensive and can be followed by someone unfamiliar with the process."""
 
 class TeamViewSet(viewsets.ModelViewSet):
     """
@@ -296,26 +308,35 @@ class TaskViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='user-and-team-tasks')
     def user_and_team_tasks(self, request):
         user = request.user
-
-        # All tasks assigned to the current user (personal or team-based)
-        user_tasks = Task.objects.filter(assigned_to=user)
-
-        # All team tasks in user's teams NOT assigned to the user
-        user_teams = Team.objects.filter(members=user)
-        team_tasks = Task.objects.filter(team__in=user_teams).exclude(assigned_to=user)
-
-        # Optional status filter
-        status_param = request.query_params.get('status')
-        if status_param:
-            user_tasks = user_tasks.filter(status=status_param)
-            team_tasks = team_tasks.filter(status=status_param)
-
-        user_tasks_serializer = TaskSerializer(user_tasks, many=True)
-        team_tasks_serializer = TaskSerializer(team_tasks, many=True)
-
+        team_id = request.query_params.get('team')
+        status = request.query_params.get('status')
+        
+        # Get user's personal tasks
+        user_tasks_query = Task.objects.filter(assigned_to=user, team__isnull=True)
+        
+        # Get team tasks the user has access to
+        team_tasks_query = Task.objects.filter(
+            Q(team__team_memberships__user=user)
+        ).distinct()
+        
+        # Apply status filter to both queries if provided
+        if status:
+            user_tasks_query = user_tasks_query.filter(status=status)
+            team_tasks_query = team_tasks_query.filter(status=status)
+        
+        # Apply team filter if provided
+        if team_id:
+            # If team_id is provided, only return tasks from that team
+            # This is what needs to be fixed
+            user_tasks_query = Task.objects.none()  # No personal tasks when filtering by team
+            team_tasks_query = team_tasks_query.filter(team_id=team_id)
+        
+        user_tasks = TaskSerializer(user_tasks_query, many=True).data
+        team_tasks = TaskSerializer(team_tasks_query, many=True).data
+        
         return Response({
-            'user_tasks': user_tasks_serializer.data,
-            'team_tasks': team_tasks_serializer.data
+            'user_tasks': user_tasks,
+            'team_tasks': team_tasks
         })
     
 class UsersInSameTeamView(generics.ListAPIView):
@@ -687,16 +708,26 @@ class DocumentDeleteView(APIView):
         
         # user has permission to delete the document
         try:
-            # Delete from Google Drive
+            # Get credentials from session
+            creds_json = request.session.get('google_drive_credentials')
+            if not creds_json:
+                return Response({'error': 'Not authenticated with Google Drive'}, 
+                               status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Load the stored credentials
             gauth = GoogleAuth()
+            gauth.DEFAULT_SETTINGS['client_config_file'] = settings.GOOGLE_CLIENT_SECRETS_FILE
+            credentials = OAuth2Credentials.from_json(creds_json)
+            gauth.credentials = credentials
+            
+            # Now use the authenticated drive instance
             drive = GoogleDrive(gauth)
             file1 = drive.CreateFile({'id': document.google_drive_file_id})
             file1.Delete()
             
             # Delete from database
             document.delete()
-
-            # Return success (204 No Content is standard for successful DELETE)
+            
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             # Return error response if deletion fails
@@ -746,5 +777,54 @@ class DocumentPermission(permissions.BasePermission):
                 
         # If document doesn't belong to a team, only owner can access
         return obj.owner == request.user
+
+class DocumentReviewDateUpdateView(APIView):
+    """API endpoint for updating a document's review date."""
+    permission_classes = [IsAuthenticated]
+    
+    def patch(self, request, document_id):
+        # Your existing PATCH method implementation
+        return self._update_review_date(request, document_id)
+    
+    def put(self, request, document_id):
+        # Add support for PUT method
+        return self._update_review_date(request, document_id)
+    
+    def _update_review_date(self, request, document_id):
+        """Internal method to handle the review date update logic"""
+        try:
+            # Get the document
+            document = get_object_or_404(Document, id=document_id)
+            
+            # Check permissions (same as delete)
+            if document.team:
+                try:
+                    membership = TeamMembership.objects.get(user=request.user, team=document.team)
+                    if document.owner != request.user and membership.role != 'owner':
+                        return Response({'error': 'Only team owners or document creator can update review dates'},
+                                      status=status.HTTP_403_FORBIDDEN)
+                except TeamMembership.DoesNotExist:
+                    return Response({'error': 'You are not a member of this team'},
+                                  status=status.HTTP_403_FORBIDDEN)
+            elif document.owner != request.user:
+                return Response({'error': 'You do not have permission to update this document'},
+                              status=status.HTTP_403_FORBIDDEN)
+            
+            # Update the review date
+            review_date = request.data.get('review_date')
+            document.review_date = review_date
+            document.save()
+            
+            # Return success response with updated document data
+            serializer = DocumentSerializer(document)
+            return Response({
+                'message': 'Review date updated successfully',
+                'document': serializer.data
+            })
+            
+        except Document.DoesNotExist:
+            return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

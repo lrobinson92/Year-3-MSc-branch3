@@ -20,7 +20,8 @@ const EditTask = ({
     teams,
     teamMembers,
     currentTask,
-    loading
+    loading,
+    isOwner
 }) => {
     // Get task ID from URL parameters
     const { id } = useParams();
@@ -64,20 +65,25 @@ const EditTask = ({
                 });
                 
                 // Check if user has permission to edit this task
-                // User can edit if they're the assigned person or team owner
                 const isAssignedUser = taskData.assigned_to === user.id;
-                const isTeamOwner = taskData.team && user.teams && 
-                    user.teams.some(team => 
-                        team.id === taskData.team && 
-                        team.role === 'owner'
+                
+                // Use team_members data from the task to check ownership
+                let isTeamOwner = false;
+                if (taskData.team && taskData.team_members) {
+                    const userMembership = taskData.team_members.find(
+                        member => member.user === user.id
                     );
+                    isTeamOwner = userMembership?.role === 'owner';
+                }
+                
+                console.log('Permission check:', { 
+                    isAssignedUser, 
+                    isTeamOwner,
+                    taskTeam: taskData.team,
+                    team_members: taskData.team_members
+                });
                 
                 setCanEdit(isAssignedUser || isTeamOwner);
-                
-                // If task belongs to a team, fetch team members
-                if (taskData.team) {
-                    fetchTeamMembers(taskData.team, user.id);
-                }
                 
             } catch (err) {
                 console.error('Failed to fetch task or teams:', err);
@@ -87,7 +93,7 @@ const EditTask = ({
         if (user && id) {
             fetchTaskData();
         }
-    }, [id, user, getTaskDetails, fetchTeams, fetchTeamMembers]);
+    }, [id, user, getTaskDetails, fetchTeams]);
 
     /**
      * Fetch team members when team selection changes
@@ -301,7 +307,8 @@ const mapStateToProps = (state) => ({
     teams: state.team.teams || [],
     teamMembers: state.task.teamMembers || [],
     currentTask: state.task.currentTask,
-    loading: state.task.loading
+    loading: state.task.loading,
+    isOwner: state.task.isOwner
 });
 
 /**

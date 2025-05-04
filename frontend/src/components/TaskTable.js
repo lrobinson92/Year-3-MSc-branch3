@@ -9,6 +9,8 @@ import { updateTaskStatus, deleteTask } from '../actions/task';
 import { formatDate } from '../utils/utils';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 
 /**
  * TaskTable Component
@@ -22,6 +24,7 @@ import Button from 'react-bootstrap/Button';
  * @param {Function} updateTaskStatus - Redux action to update task status
  * @param {Function} deleteTask - Redux action to delete a task
  * @param {Function} onRowClick - Optional custom handler for row clicks
+ * @param {Object} currentUser - Current logged-in user
  */
 const TaskTable = ({
     tasks = [],
@@ -35,7 +38,8 @@ const TaskTable = ({
     },
     updateTaskStatus,
     deleteTask,
-    onRowClick
+    onRowClick,
+    currentUser
 }) => {
     // Navigation hook for redirecting after actions
     const navigate = useNavigate();
@@ -260,6 +264,30 @@ const TaskTable = ({
         return text.slice(0, maxLength) + '...';
     };
 
+    /**
+     * Check if current user has permission to modify a task
+     * User can modify task if they are assigned to it or if they're the team owner
+     * 
+     * @param {Object} task - Task to check permissions for
+     * @returns {boolean} True if user has permission
+     */
+    const hasTaskPermission = (task) => {
+        if (!currentUser || !task) return false;
+        
+        // User can modify if they are assigned to the task
+        if (task.assigned_to === currentUser.id) return true;
+        
+        // User can modify if they are the team owner
+        if (task.team && task.team_members) {
+            const userMembership = task.team_members.find(
+                member => member.user === currentUser.id
+            );
+            return userMembership?.role === 'owner';
+        }
+        
+        return false;
+    };
+
     // Show message when no tasks are available
     if (!tasks.length) {
         return <div className="alert alert-info text-center">{emptyMessage}</div>;
@@ -365,34 +393,85 @@ const TaskTable = ({
                                     {showColumns.actions && (
                                         <td>
                                             <div className="d-flex justify-content-center gap-2">
-                                                {/* Edit button */}
-                                                <button 
-                                                    className="btn btn-sm task-icon-button"
-                                                    onClick={(e) => handleEdit(e, task.id)} 
-                                                    title="Edit"
-                                                >
-                                                    <FaEdit size={14} className="text-primary" />
-                                                </button>
-                                                
-                                                {/* Complete button (only for incomplete tasks) */}
-                                                {task.status !== 'complete' && (
+                                                {/* Edit button - conditionally render/disable */}
+                                                {hasTaskPermission(task) ? (
                                                     <button 
                                                         className="btn btn-sm task-icon-button"
-                                                        onClick={(e) => handleComplete(e, task)} 
-                                                        title="Mark Complete"
+                                                        onClick={(e) => handleEdit(e, task.id)} 
+                                                        title="Edit"
                                                     >
-                                                        <FaCheck size={14} className="text-success" />
+                                                        <FaEdit size={14} className="text-primary" />
                                                     </button>
+                                                ) : (
+                                                    <OverlayTrigger
+                                                        placement="top"
+                                                        overlay={<Tooltip>You cannot edit this task unless it is assigned to you or you are the team owner</Tooltip>}
+                                                    >
+                                                        <span>
+                                                            <button 
+                                                                className="btn btn-sm task-icon-button"
+                                                                disabled
+                                                                style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                                            >
+                                                                <FaEdit size={14} className="text-primary" />
+                                                            </button>
+                                                        </span>
+                                                    </OverlayTrigger>
+                                                )}
+                                                
+                                                {/* Complete button - only for incomplete tasks */}
+                                                {task.status !== 'complete' && (
+                                                    hasTaskPermission(task) ? (
+                                                        <button 
+                                                            className="btn btn-sm task-icon-button"
+                                                            onClick={(e) => handleComplete(e, task)} 
+                                                            title="Mark Complete"
+                                                        >
+                                                            <FaCheck size={14} className="text-success" />
+                                                        </button>
+                                                    ) : (
+                                                        <OverlayTrigger
+                                                            placement="top"
+                                                            overlay={<Tooltip>You cannot mark this task as complete unless it is assigned to you or you are the team owner</Tooltip>}
+                                                        >
+                                                            <span>
+                                                                <button 
+                                                                    className="btn btn-sm task-icon-button"
+                                                                    disabled
+                                                                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                                                >
+                                                                    <FaCheck size={14} className="text-success" />
+                                                                </button>
+                                                            </span>
+                                                        </OverlayTrigger>
+                                                    )
                                                 )}
                                                 
                                                 {/* Delete button */}
-                                                <button 
-                                                    className="btn btn-sm task-icon-button"
-                                                    onClick={(e) => handleDelete(e, task)} 
-                                                    title="Delete"
-                                                >
-                                                    <FaTrash size={14} className="text-danger" />
-                                                </button>
+                                                {hasTaskPermission(task) ? (
+                                                    <button 
+                                                        className="btn btn-sm task-icon-button"
+                                                        onClick={(e) => handleDelete(e, task)} 
+                                                        title="Delete"
+                                                    >
+                                                        <FaTrash size={14} className="text-danger" />
+                                                    </button>
+                                                ) : (
+                                                    <OverlayTrigger
+                                                        placement="top"
+                                                        overlay={<Tooltip>You cannot delete this task unless it is assigned to you or you are the team owner</Tooltip>}
+                                                    >
+                                                        <span>
+                                                            <button 
+                                                                className="btn btn-sm task-icon-button"
+                                                                disabled
+                                                                style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                                            >
+                                                                <FaTrash size={14} className="text-danger" />
+                                                            </button>
+                                                        </span>
+                                                    </OverlayTrigger>
+                                                )}
                                             </div>
                                         </td>
                                     )}
@@ -440,5 +519,10 @@ const TaskTable = ({
     );
 };
 
-// Connect component to Redux actions
-export default connect(null, { updateTaskStatus, deleteTask })(TaskTable);
+// Update mapStateToProps to include the current user
+const mapStateToProps = (state) => ({
+    currentUser: state.auth.user
+});
+
+// Connect component to Redux store
+export default connect(mapStateToProps, { updateTaskStatus, deleteTask })(TaskTable);

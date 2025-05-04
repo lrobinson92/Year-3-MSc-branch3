@@ -1,5 +1,4 @@
 import axiosInstance from '../utils/axiosConfig';
-import { marked } from 'marked';
 import mammoth from 'mammoth';
 import { combineShortParagraphs, formatMarkdownToHTML } from '../utils/utils';
 import { 
@@ -21,7 +20,10 @@ import {
   IMPROVE_SOP_FAIL,
   SUMMARIZE_SOP_START,
   SUMMARIZE_SOP_SUCCESS,
-  SUMMARIZE_SOP_FAIL
+  SUMMARIZE_SOP_FAIL,
+  CLEAR_SUMMARY,
+  CLEAR_IMPROVED_CONTENT,
+  CLEAR_DOCUMENT_ERROR
 } from './types';
 
 /**
@@ -373,6 +375,14 @@ export const improveSOP = (content) => async (dispatch) => {
  * @returns {Object} Result with summary or error message
  */
 export const summarizeSOP = (content) => async (dispatch) => {
+  // When clearing
+  if (!content) {
+    dispatch({
+      type: 'CLEAR_SUMMARY'
+    });
+    return;
+  }
+  
   // Signal processing start
   dispatch({ type: SUMMARIZE_SOP_START });
   
@@ -393,11 +403,72 @@ export const summarizeSOP = (content) => async (dispatch) => {
   } catch (error) {
     dispatch({
       type: SUMMARIZE_SOP_FAIL,
-      payload: error.response?.data || 'Could not summarize SOP'
+      payload: error.message || String(error)
     });
     
-    return { success: false, error: error.response?.data || 'Could not summarize SOP' };
+    return { success: false, error: error.message || String(error) };
   }
+};
+
+/**
+ * Clear the summary from the Redux store
+ */
+export const clearSummary = () => dispatch => {
+    dispatch({
+        type: CLEAR_SUMMARY
+    });
+};
+
+/**
+ * Clear the improved content from the Redux store
+ * Used when navigating away or after document creation
+ */
+export const clearImprovedContent = () => dispatch => {
+    dispatch({
+        type: CLEAR_IMPROVED_CONTENT
+    });
+};
+
+/**
+ * Update a document's review date
+ * 
+ * @param {string} documentId - ID of document to update
+ * @param {string} reviewDate - New review date in YYYY-MM-DD format
+ * @returns {Object} Result object with success status
+ */
+export const updateReviewDate = (documentId, reviewDate) => async dispatch => {
+  try {
+    const response = await axiosInstance.patch(
+      `${process.env.REACT_APP_API_URL}/api/documents/${documentId}/update-review/`, 
+      { review_date: reviewDate },
+      { withCredentials: true }
+    );
+    
+    dispatch({
+      type: 'UPDATE_REVIEW_DATE_SUCCESS',
+      payload: { id: documentId, review_date: reviewDate }
+    });
+    
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error('Error updating review date:', error);
+    
+    dispatch({
+      type: 'UPDATE_REVIEW_DATE_FAIL',
+      payload: error.response?.data || 'Failed to update review date'
+    });
+    
+    return { success: false, error: error.response?.data || 'Failed to update review date' };
+  }
+};
+
+/**
+ * Clear any document-related errors from the store
+ */
+export const clearDocumentError = () => dispatch => {
+  dispatch({
+    type: CLEAR_DOCUMENT_ERROR
+  });
 };
 
 

@@ -1,3 +1,4 @@
+// Disclaimer: Portions of this code were modified from Django and React tutorials to fit the requirements of the project (see requirements tutorials section).
 import axiosInstance from '../utils/axiosConfig'; 
 import {
     LOGIN_SUCCESS,

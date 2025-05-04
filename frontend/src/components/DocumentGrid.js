@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { FaEye, FaEdit, FaTrash, FaEllipsisV } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaCalendarAlt } from 'react-icons/fa';
 import { Dropdown, Toast, ToastContainer } from 'react-bootstrap';
 import { deleteDocument } from '../actions/googledrive';
 import CustomToggle from '../utils/customToggle';
@@ -56,20 +56,12 @@ const DocumentGrid = ({
     e.stopPropagation(); // Prevent triggering document click event
     
     // User confirmation before deletion
-    if (!window.confirm(`Are you sure you want to delete "${doc.title || doc.name}"?`)) {
-      return;
-    }
-    
-    // If actions provides a custom delete handler, use that
     if (actions.onDelete) {
+      // Let the custom handler manage its own notifications
       actions.onDelete(doc);
-      // Show toast notification for custom handler too
-      setToastMessage(`"${doc.title || doc.name}" has been deleted`);
-      setShowToast(true);
       return;
     }
     
-    // Otherwise use the Redux action
     const success = await deleteDocument(doc.id);
     
     if (success) {
@@ -166,24 +158,53 @@ const DocumentGrid = ({
                     <Dropdown.Toggle as={CustomToggle} id={`dropdown-${doc.id}`}>
                       ...
                     </Dropdown.Toggle>
-                    <Dropdown.Menu align="end" size="sm">
-                      <Dropdown.Item onClick={() => handleDocumentClick(doc)}>
-                        <FaEye className="me-2" /> View
+                    <Dropdown.Menu 
+                      align="end" 
+                      size="sm"
+                      style={{
+                        fontSize: '0.75rem',     // Make text smaller
+                        padding: '0.0rem 0',    // Reduce padding
+                        minWidth: '180px',       // Limit width
+                        transform: 'translateY(4px)' // Adjust position
+                      }}
+                    >
+                      <Dropdown.Item 
+                        onClick={() => handleDocumentClick(doc)}
+                        style={{ padding: '0.2rem 1rem' }} // Reduce item padding
+                      >
+                        <FaEye className="me-2" style={{ fontSize: '0.75rem' }} /> View
                       </Dropdown.Item>
+                      
                       <Dropdown.Item 
                         as="a"
                         href={doc.file_url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        style={{ padding: '0.2rem 1rem' }} // Reduce item padding
                       >
-                        <FaEdit className="me-2" /> Edit in Google Drive
+                        <FaEdit className="me-2" style={{ fontSize: '0.75rem' }} /> Edit in Google Drive
                       </Dropdown.Item>
+                      
+                      {/* Updating review date */}
+                      {(!actions.canUpdateReviewDate || (actions.canUpdateReviewDate && actions.canUpdateReviewDate(doc))) && (
+                        <Dropdown.Item 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (actions.onUpdateReviewDate) actions.onUpdateReviewDate(doc);
+                          }}
+                          style={{ padding: '0.2rem 1rem' }} // Reduce item padding
+                        >
+                          <FaCalendarAlt className="me-2" style={{ fontSize: '0.75rem' }} /> Update Review Date
+                        </Dropdown.Item>
+                      )}
+                      
                       {(!actions.canDelete || (actions.canDelete && actions.canDelete(doc))) && (
                         <Dropdown.Item 
                           className="text-danger"
                           onClick={(e) => handleDeleteDocument(e, doc)}
+                          style={{ padding: '0.2rem 1rem' }} // Reduce item padding
                         >
-                          <FaTrash className="me-2" /> Delete
+                          <FaTrash className="me-2" style={{ fontSize: '0.75rem' }} /> Delete
                         </Dropdown.Item>
                       )}
                     </Dropdown.Menu>

@@ -15,7 +15,10 @@ import {
     IMPROVE_SOP_FAIL,
     SUMMARIZE_SOP_START,
     SUMMARIZE_SOP_SUCCESS,
-    SUMMARIZE_SOP_FAIL
+    SUMMARIZE_SOP_FAIL,
+    CLEAR_SUMMARY,
+    CLEAR_IMPROVED_CONTENT,
+    CLEAR_DOCUMENT_ERROR
 } from '../actions/types';
 
 const initialState = {
@@ -127,14 +130,46 @@ export default function(state = initialState, action) {
         case SUMMARIZE_SOP_SUCCESS:
             return {
                 ...state,
-                summarizingSOP: false,
-                summary: payload
+                summary: action.payload || '',
+                summarizingSOP: false
             };
         case SUMMARIZE_SOP_FAIL:
             return {
                 ...state,
                 summarizingSOP: false,
                 error: payload
+            };
+        case CLEAR_SUMMARY:
+            return {
+                ...state,
+                summary: '',
+                summarizingSOP: false
+            };
+        case CLEAR_IMPROVED_CONTENT:
+            return {
+                ...state,
+                originalContent: '',
+                improvedContent: '',
+                improvingSOP: false
+            };
+        case 'UPDATE_REVIEW_DATE_SUCCESS':
+            return {
+                ...state,
+                documents: state.documents.map(doc => 
+                    doc.id === payload.id 
+                        ? { ...doc, review_date: payload.review_date }
+                        : doc
+                )
+            };
+        case 'UPDATE_REVIEW_DATE_FAIL':
+            return {
+                ...state,
+                error: payload
+            };
+        case CLEAR_DOCUMENT_ERROR:
+            return {
+                ...state,
+                error: null
             };
         default:
             return state;
