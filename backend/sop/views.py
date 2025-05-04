@@ -14,7 +14,7 @@ from pydrive2.drive import GoogleDrive
 from oauth2client.client import OAuth2Credentials
 from openai import OpenAI
 from rest_framework import status, generics, viewsets, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -308,26 +308,35 @@ class TaskViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='user-and-team-tasks')
     def user_and_team_tasks(self, request):
         user = request.user
-
-        # All tasks assigned to the current user (personal or team-based)
-        user_tasks = Task.objects.filter(assigned_to=user)
-
-        # All team tasks in user's teams NOT assigned to the user
-        user_teams = Team.objects.filter(members=user)
-        team_tasks = Task.objects.filter(team__in=user_teams).exclude(assigned_to=user)
-
-        # Optional status filter
-        status_param = request.query_params.get('status')
-        if status_param:
-            user_tasks = user_tasks.filter(status=status_param)
-            team_tasks = team_tasks.filter(status=status_param)
-
-        user_tasks_serializer = TaskSerializer(user_tasks, many=True)
-        team_tasks_serializer = TaskSerializer(team_tasks, many=True)
-
+        team_id = request.query_params.get('team')
+        status = request.query_params.get('status')
+        
+        # Get user's personal tasks
+        user_tasks_query = Task.objects.filter(assigned_to=user, team__isnull=True)
+        
+        # Get team tasks the user has access to
+        team_tasks_query = Task.objects.filter(
+            Q(team__team_memberships__user=user)
+        ).distinct()
+        
+        # Apply status filter to both queries if provided
+        if status:
+            user_tasks_query = user_tasks_query.filter(status=status)
+            team_tasks_query = team_tasks_query.filter(status=status)
+        
+        # Apply team filter if provided
+        if team_id:
+            # If team_id is provided, only return tasks from that team
+            # This is what needs to be fixed
+            user_tasks_query = Task.objects.none()  # No personal tasks when filtering by team
+            team_tasks_query = team_tasks_query.filter(team_id=team_id)
+        
+        user_tasks = TaskSerializer(user_tasks_query, many=True).data
+        team_tasks = TaskSerializer(team_tasks_query, many=True).data
+        
         return Response({
-            'user_tasks': user_tasks_serializer.data,
-            'team_tasks': team_tasks_serializer.data
+            'user_tasks': user_tasks,
+            'team_tasks': team_tasks
         })
     
 class UsersInSameTeamView(generics.ListAPIView):
@@ -768,5 +777,54 @@ class DocumentPermission(permissions.BasePermission):
                 
         # If document doesn't belong to a team, only owner can access
         return obj.owner == request.user
+
+class DocumentReviewDateUpdateView(APIView):
+    """API endpoint for updating a document's review date."""
+    permission_classes = [IsAuthenticated]
+    
+    def patch(self, request, document_id):
+        # Your existing PATCH method implementation
+        return self._update_review_date(request, document_id)
+    
+    def put(self, request, document_id):
+        # Add support for PUT method
+        return self._update_review_date(request, document_id)
+    
+    def _update_review_date(self, request, document_id):
+        """Internal method to handle the review date update logic"""
+        try:
+            # Get the document
+            document = get_object_or_404(Document, id=document_id)
+            
+            # Check permissions (same as delete)
+            if document.team:
+                try:
+                    membership = TeamMembership.objects.get(user=request.user, team=document.team)
+                    if document.owner != request.user and membership.role != 'owner':
+                        return Response({'error': 'Only team owners or document creator can update review dates'},
+                                      status=status.HTTP_403_FORBIDDEN)
+                except TeamMembership.DoesNotExist:
+                    return Response({'error': 'You are not a member of this team'},
+                                  status=status.HTTP_403_FORBIDDEN)
+            elif document.owner != request.user:
+                return Response({'error': 'You do not have permission to update this document'},
+                              status=status.HTTP_403_FORBIDDEN)
+            
+            # Update the review date
+            review_date = request.data.get('review_date')
+            document.review_date = review_date
+            document.save()
+            
+            # Return success response with updated document data
+            serializer = DocumentSerializer(document)
+            return Response({
+                'message': 'Review date updated successfully',
+                'document': serializer.data
+            })
+            
+        except Document.DoesNotExist:
+            return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

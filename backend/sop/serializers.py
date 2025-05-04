@@ -80,15 +80,17 @@ class TaskSerializer(serializers.ModelSerializer):
     # Add read-only fields for displaying names instead of just IDs
     assigned_to_name = serializers.SerializerMethodField()
     team_name = serializers.SerializerMethodField()
+    team_members = serializers.SerializerMethodField()
     
     class Meta:
         model = Task
         fields = [
             'id', 'description', 'assigned_to', 'assigned_to_name',
-            'team', 'team_name', 'due_date', 'status',
+            'team', 'team_name', 'team_members',  # Added team_members here
+            'due_date', 'status',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'assigned_to_name', 'team_name']
+        read_only_fields = ['created_at', 'updated_at', 'assigned_to_name', 'team_name', 'team_members']
     
     def get_assigned_to_name(self, obj):
         """
@@ -105,6 +107,13 @@ class TaskSerializer(serializers.ModelSerializer):
         if obj.team:
             return obj.team.name
         return None
+    
+    def get_team_members(self, obj):
+        if obj.team:
+            # Include team members when task has a team
+            members = TeamMembership.objects.filter(team=obj.team)
+            return TeamMembershipSerializer(members, many=True).data
+        return []
     
     def validate(self, data):
         """

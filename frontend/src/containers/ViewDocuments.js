@@ -10,6 +10,8 @@ import { setDocuments, setDriveLoggedIn } from '../actions/googledrive';
 import { FaTrash } from 'react-icons/fa';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
+import ReviewDateModal from '../components/ReviewDateModal';
+import { updateReviewDate } from '../actions/googledrive';
 
 /**
  * ViewDocuments Component
@@ -21,7 +23,7 @@ import Button from 'react-bootstrap/Button';
  * Requires Google Drive authentication to view and manage documents.
  * Provides document deletion functionality with permission checks.
  */
-const ViewDocuments = ({ isAuthenticated, user, driveLoggedIn, documents, setDocuments }) => {
+const ViewDocuments = ({ isAuthenticated, user, driveLoggedIn, documents, setDocuments, updateReviewDate }) => {
   // UI state
   const [loading, setLoading] = useState(true);          // Loading indicator
   const [error, setError] = useState(null);              // Error message
@@ -37,6 +39,12 @@ const ViewDocuments = ({ isAuthenticated, user, driveLoggedIn, documents, setDoc
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+
+  // Review date handling state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [documentToReview, setDocumentToReview] = useState(null);
+  const [updatingReview, setUpdatingReview] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
 
   /**
    * Handle pending document view after Google Drive authentication
@@ -178,10 +186,59 @@ const ViewDocuments = ({ isAuthenticated, user, driveLoggedIn, documents, setDoc
     }
   };
 
+  /**
+   * Handle review date button click
+   * Sets up the review date modal
+   * 
+   * @param {object} document - The document to update review date for
+   */
+  const handleReviewDateClick = (document) => {
+    setDocumentToReview(document);
+    setShowReviewModal(true);
+    setReviewError(null);
+  };
+
+  /**
+   * Handle review date update confirmation
+   * Sends update request to API and updates UI on success
+   */
+  const handleUpdateReviewDate = async (newDate) => {
+    if (!documentToReview) return;
+    
+    setUpdatingReview(true);
+    setReviewError(null);
+    
+    try {
+      const result = await updateReviewDate(documentToReview.id, newDate);
+      
+      if (result.success) {
+        // Close modal and update local state
+        setShowReviewModal(false);
+        
+        // Update documents if needed
+        const updatedDocuments = documents.map(doc => 
+          doc.id === documentToReview.id 
+            ? { ...doc, review_date: newDate } 
+            : doc
+        );
+        setDocuments(updatedDocuments);
+      } else {
+        setReviewError(result.error || 'Failed to update review date');
+      }
+    } catch (err) {
+      console.error('Error updating review date:', err);
+      setReviewError('An unexpected error occurred. Please try again.');
+    } finally {
+      setUpdatingReview(false);
+    }
+  };
+
   // Document action handlers passed to DocumentGrid component
   const documentActions = {
     onDelete: handleDeleteClick,
-    canDelete: canDeleteDocument
+    canDelete: canDeleteDocument,
+    onUpdateReviewDate: handleReviewDateClick,
+    canUpdateReviewDate: canDeleteDocument
   };
 
   // Redirect to login if not authenticated
@@ -266,6 +323,15 @@ const ViewDocuments = ({ isAuthenticated, user, driveLoggedIn, documents, setDoc
         </div>
       </div>
 
+      {/* Review Date Modal */}
+      <ReviewDateModal
+        show={showReviewModal}
+        onHide={() => setShowReviewModal(false)}
+        onSubmit={handleUpdateReviewDate}
+        document={documentToReview}
+        isUpdating={updatingReview}
+      />
+
       {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
         <Modal.Header closeButton>
@@ -313,4 +379,5 @@ const mapStateToProps = (state) => ({
 export default connect(mapStateToProps, {
   setDocuments,
   setDriveLoggedIn,
+  updateReviewDate
 })(ViewDocuments);
